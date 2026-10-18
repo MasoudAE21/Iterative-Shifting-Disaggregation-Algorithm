@@ -1,0 +1,4 @@
+{
+  "bill_sample": "Deliberate small example selection: first encountered full/partial/uncovered/overlap/gap/zero/negative customers when present, plus initial customers up to ten. All rows for selected customers preserved in original order; only SubscriptionNumber replaced. No original ID mapping included. Dates and other quasi-identifiers remain; pseudonymized, not guaranteed anonymous. Not a representative sample.",
+  "weather_sample": "Verbatim metadata and headers; first/last six rows and 19:00-23:00 UTC around target start/end boundaries. Intentionally discontinuous; gaps in this sample are not source missingness. GMT 20:00 and 21:00 bracket Tehran midnight at 20:30 UTC."
+}

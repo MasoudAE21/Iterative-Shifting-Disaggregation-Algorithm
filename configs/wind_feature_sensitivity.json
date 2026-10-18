@@ -1,0 +1,5 @@
+{
+  "max_customers": 1000,
+  "sample_scope": "cohort",
+  "feature_preset": "winter_hdd65_hddw65_v1"
+}

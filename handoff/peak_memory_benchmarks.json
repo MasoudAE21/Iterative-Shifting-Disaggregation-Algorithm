@@ -1,0 +1,25 @@
+{
+  "available_ram_before_full_run_bytes": 6051561472,
+  "full_process_budget_bytes": 4000000000,
+  "measurements": [
+    {
+      "customers": 10000,
+      "row_group_size": 10000,
+      "rss_before_export": 122060800,
+      "peak_rss": 144912384,
+      "incremental_peak_rss": 22851584,
+      "seconds": 3.328101899998728,
+      "reconciled_bills": 10000
+    },
+    {
+      "customers": 100000,
+      "row_group_size": 10000,
+      "rss_before_export": 174104576,
+      "peak_rss": 207257600,
+      "incremental_peak_rss": 33153024,
+      "seconds": 33.914193999997224,
+      "reconciled_bills": 100000
+    }
+  ],
+  "method": "Fresh processes; 20 ms RSS sampling; no tracemalloc; fixed 10000-row groups; includes complete bill and target exports."
+}

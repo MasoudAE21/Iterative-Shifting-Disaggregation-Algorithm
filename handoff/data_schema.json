@@ -1,0 +1,792 @@
+{
+  "audit_version": 1,
+  "files": [
+    {
+      "filename": "An Iterative Shifting Disaggregation Algorithm .pdf",
+      "bytes": 7039897,
+      "sha256": "da4804937e984877a257dee8b4affefa9670989d351d236bbdcd253b011792d5",
+      "magic_hex": "255044462d312e370d25e2e3cfd30d0a",
+      "format": "PDF",
+      "encoding": null,
+      "newline": "CRLF"
+    },
+    {
+      "filename": "bill_1403.csv",
+      "bytes": 23722904,
+      "sha256": "a40d065cf7bf0168c34443912318ad5f51e07b8af99a77c351191cbbe828f29d",
+      "magic_hex": "efbbbf537562736372697074696f6e4e",
+      "format": "CSV text",
+      "encoding": "utf-8-sig",
+      "newline": "CRLF"
+    },
+    {
+      "filename": "bill_1403_top_10000.csv",
+      "bytes": 463112,
+      "sha256": "a2da3a4deb7771a2e5bf8e3801e0e1afe5af739a78cbfb70769edbc12ff654b1",
+      "magic_hex": "efbbbf537562736372697074696f6e4e",
+      "format": "CSV text",
+      "encoding": "utf-8-sig",
+      "newline": "CRLF"
+    },
+    {
+      "filename": "open-meteo-34.41N50.49E1435m.csv",
+      "bytes": 88353,
+      "sha256": "6c56d838b470e1255332b1ec0e39c48280bbfe27e0c7b0d8df65582cc1894533",
+      "magic_hex": "6c617469747564652c6c6f6e67697475",
+      "format": "CSV text",
+      "encoding": "utf-8",
+      "newline": "LF"
+    }
+  ],
+  "bill_schema": {
+    "delimiter": ",",
+    "quotechar": "\"",
+    "metadata_rows": 0,
+    "header_line_1_based": 1,
+    "encoding": "UTF-8 with BOM",
+    "columns": {
+      "SubscriptionNumber": {
+        "storage": "string",
+        "semantic": "customer ID; retain leading zeroes; do not numeric-coerce"
+      },
+      "FromDate": {
+        "storage": "date",
+        "format": "%Y-%m-%d",
+        "calendar": "Gregorian observed format; source confirmation requested",
+        "endpoint": "provisionally inclusive"
+      },
+      "ToDate": {
+        "storage": "date",
+        "format": "%Y-%m-%d",
+        "endpoint": "provisionally inclusive"
+      },
+      "Consumption": {
+        "storage": "decimal numeric",
+        "unit": null,
+        "semantic": "bill total, interpretation unconfirmed"
+      },
+      "ConsumptionType": {
+        "storage": "string code",
+        "label": null
+      },
+      "UnitCount": {
+        "storage": "numeric integer as observed",
+        "semantic": null
+      },
+      "Capacity": {
+        "storage": "numeric as observed",
+        "unit": null,
+        "semantic": null
+      }
+    }
+  },
+  "bill_audits": {
+    "bill_1403.csv": {
+      "row_count": 513921,
+      "distinct_customers": 362660,
+      "headers": [
+        "SubscriptionNumber",
+        "FromDate",
+        "ToDate",
+        "Consumption",
+        "ConsumptionType",
+        "UnitCount",
+        "Capacity"
+      ],
+      "missing_or_whitespace": {
+        "SubscriptionNumber": 0,
+        "FromDate": 0,
+        "ToDate": 0,
+        "Consumption": 0,
+        "ConsumptionType": 0,
+        "UnitCount": 0,
+        "Capacity": 0
+      },
+      "numeric_parse_failures": {
+        "Consumption": 0,
+        "ConsumptionType": 0,
+        "UnitCount": 0,
+        "Capacity": 0
+      },
+      "fractional_numeric_rows": {
+        "Consumption": 0,
+        "ConsumptionType": 0,
+        "UnitCount": 0,
+        "Capacity": 0
+      },
+      "numeric_ranges": {
+        "Consumption": {
+          "min": "0",
+          "max": "85820"
+        },
+        "ConsumptionType": {
+          "min": "40",
+          "max": "40"
+        },
+        "UnitCount": {
+          "min": "1",
+          "max": "112"
+        },
+        "Capacity": {
+          "min": "4",
+          "max": "160"
+        }
+      },
+      "observed_values": {
+        "ConsumptionType": {
+          "40": 513921
+        },
+        "UnitCount": {
+          "1": 391698,
+          "2": 103507,
+          "3": 16783,
+          "4": 554,
+          "12": 157,
+          "5": 139,
+          "6": 246,
+          "18": 69,
+          "16": 187,
+          "7": 81,
+          "8": 163,
+          "15": 27,
+          "10": 102,
+          "11": 11,
+          "14": 17,
+          "25": 4,
+          "9": 27,
+          "20": 50,
+          "26": 8,
+          "27": 4,
+          "21": 3,
+          "40": 1,
+          "49": 1,
+          "24": 40,
+          "30": 11,
+          "28": 1,
+          "13": 1,
+          "17": 12,
+          "19": 3,
+          "108": 4,
+          "59": 4,
+          "112": 3,
+          "88": 3
+        },
+        "Capacity": {
+          "6": 408067,
+          "10": 84276,
+          "16": 14058,
+          "65": 194,
+          "25": 773,
+          "40": 417,
+          "100": 328,
+          "4": 5730,
+          "160": 78
+        }
+      },
+      "customer_id_length_counts": {
+        "11": 513921
+      },
+      "non_digit_id_rows": 0,
+      "bills_per_customer": {
+        "1": 211656,
+        "2": 150750,
+        "3": 251,
+        "4": 3
+      },
+      "from_date_range": [
+        "2025-01-02",
+        "2025-04-29"
+      ],
+      "to_date_range": [
+        "2025-01-03",
+        "2025-04-29"
+      ],
+      "zero_consumption_rows": 21705,
+      "negative_consumption_rows": 0,
+      "exact_duplicate_excess_rows": 0,
+      "exact_duplicate_groups": 0,
+      "conflicting_customer_interval_keys": 0,
+      "invalid_interval_rows": 0,
+      "invalid_interval_reasons": {},
+      "inclusive_duration_days_counts": {
+        "1": 58,
+        "2": 14,
+        "3": 10,
+        "4": 24,
+        "5": 24,
+        "6": 24,
+        "7": 19,
+        "8": 20,
+        "9": 24,
+        "10": 104,
+        "11": 42,
+        "12": 41,
+        "13": 49,
+        "14": 42,
+        "15": 49,
+        "16": 56,
+        "17": 55,
+        "18": 57,
+        "19": 73,
+        "20": 93,
+        "21": 167,
+        "22": 204,
+        "23": 235,
+        "24": 241,
+        "25": 272,
+        "26": 230,
+        "27": 319,
+        "28": 462,
+        "29": 481,
+        "30": 768,
+        "31": 1252,
+        "32": 1613,
+        "33": 1651,
+        "34": 2316,
+        "35": 3355,
+        "36": 3159,
+        "37": 4682,
+        "38": 3889,
+        "39": 7233,
+        "40": 9253,
+        "41": 12139,
+        "42": 17331,
+        "43": 20620,
+        "44": 27193,
+        "45": 29814,
+        "46": 27139,
+        "47": 25367,
+        "48": 25016,
+        "49": 29535,
+        "50": 23171,
+        "51": 25829,
+        "52": 30239,
+        "53": 36318,
+        "54": 33067,
+        "55": 26102,
+        "56": 17282,
+        "57": 8736,
+        "58": 7862,
+        "59": 6613,
+        "60": 5789,
+        "61": 6101,
+        "62": 4736,
+        "63": 5356,
+        "64": 3018,
+        "65": 1635,
+        "66": 1444,
+        "67": 818,
+        "68": 428,
+        "69": 579,
+        "70": 315,
+        "71": 217,
+        "72": 198,
+        "73": 201,
+        "74": 180,
+        "75": 148,
+        "76": 110,
+        "77": 109,
+        "78": 89,
+        "79": 78,
+        "80": 48,
+        "81": 75,
+        "82": 89,
+        "83": 83,
+        "84": 65,
+        "85": 73,
+        "86": 49,
+        "87": 95,
+        "88": 150,
+        "89": 151,
+        "90": 254,
+        "91": 378,
+        "92": 349,
+        "93": 262,
+        "94": 293,
+        "95": 473,
+        "96": 431,
+        "97": 844,
+        "98": 1364,
+        "99": 1160,
+        "100": 859,
+        "101": 882,
+        "102": 472,
+        "103": 376,
+        "104": 385,
+        "105": 206,
+        "106": 203,
+        "107": 127,
+        "108": 59,
+        "109": 35,
+        "110": 18,
+        "111": 17,
+        "112": 2,
+        "113": 8,
+        "114": 2,
+        "116": 1,
+        "117": 1
+      },
+      "same_customer_overlap_pairs_including_duplicate_rows": 0,
+      "pairwise_overlap_days_not_union": 0,
+      "overlap_customers": 0,
+      "internal_union_gap_days": 0,
+      "gap_customers": 0,
+      "adjacent_distinct_interval_start_minus_previous_end_days": {
+        "1": 151261
+      },
+      "customers_with_attribute_changes": {
+        "ConsumptionType": 0,
+        "UnitCount": 0,
+        "Capacity": 0
+      },
+      "target": {
+        "start": "2025-01-20",
+        "end": "2025-03-20",
+        "days_per_customer": 60,
+        "inclusive_endpoint_assumption": {
+          "customers": {
+            "fully_covered": 143859,
+            "partially_covered": 218564,
+            "uncovered": 237
+          },
+          "covered_customer_days_by_class": {
+            "fully_covered": 8631540,
+            "partially_covered": 9360075,
+            "uncovered": 0
+          },
+          "uncovered_customer_days_by_class": {
+            "fully_covered": 0,
+            "partially_covered": 3753765,
+            "uncovered": 14220
+          },
+          "covered_customer_days": 17991615,
+          "uncovered_customer_days": 3767985,
+          "potential_customer_days": 21759600
+        },
+        "alternative_from_inclusive_to_exclusive": {
+          "customers": {
+            "partially_covered": 352477,
+            "fully_covered": 9939,
+            "uncovered": 244
+          },
+          "covered_customer_days": 17736019,
+          "uncovered_customer_days": 4023581
+        }
+      }
+    },
+    "bill_1403_top_10000.csv": {
+      "row_count": 10000,
+      "distinct_customers": 7181,
+      "headers": [
+        "SubscriptionNumber",
+        "FromDate",
+        "ToDate",
+        "Consumption",
+        "ConsumptionType",
+        "UnitCount",
+        "Capacity"
+      ],
+      "missing_or_whitespace": {
+        "SubscriptionNumber": 0,
+        "FromDate": 0,
+        "ToDate": 0,
+        "Consumption": 0,
+        "ConsumptionType": 0,
+        "UnitCount": 0,
+        "Capacity": 0
+      },
+      "numeric_parse_failures": {
+        "Consumption": 0,
+        "ConsumptionType": 0,
+        "UnitCount": 0,
+        "Capacity": 0
+      },
+      "fractional_numeric_rows": {
+        "Consumption": 0,
+        "ConsumptionType": 0,
+        "UnitCount": 0,
+        "Capacity": 0
+      },
+      "numeric_ranges": {
+        "Consumption": {
+          "min": "0",
+          "max": "12041"
+        },
+        "ConsumptionType": {
+          "min": "40",
+          "max": "40"
+        },
+        "UnitCount": {
+          "min": "1",
+          "max": "18"
+        },
+        "Capacity": {
+          "min": "6",
+          "max": "100"
+        }
+      },
+      "observed_values": {
+        "ConsumptionType": {
+          "40": 10000
+        },
+        "UnitCount": {
+          "1": 6090,
+          "2": 3325,
+          "3": 515,
+          "4": 13,
+          "12": 19,
+          "5": 2,
+          "6": 14,
+          "18": 7,
+          "16": 11,
+          "7": 3,
+          "8": 1
+        },
+        "Capacity": {
+          "6": 7617,
+          "10": 1948,
+          "16": 371,
+          "65": 19,
+          "25": 20,
+          "40": 7,
+          "100": 18
+        }
+      },
+      "customer_id_length_counts": {
+        "11": 10000
+      },
+      "non_digit_id_rows": 0,
+      "bills_per_customer": {
+        "1": 4367,
+        "2": 2809,
+        "3": 5
+      },
+      "from_date_range": [
+        "2025-01-02",
+        "2025-04-09"
+      ],
+      "to_date_range": [
+        "2025-01-29",
+        "2025-04-29"
+      ],
+      "zero_consumption_rows": 163,
+      "negative_consumption_rows": 0,
+      "exact_duplicate_excess_rows": 0,
+      "exact_duplicate_groups": 0,
+      "conflicting_customer_interval_keys": 0,
+      "invalid_interval_rows": 0,
+      "invalid_interval_reasons": {},
+      "inclusive_duration_days_counts": {
+        "1": 2,
+        "4": 1,
+        "6": 1,
+        "10": 1,
+        "11": 1,
+        "14": 1,
+        "18": 1,
+        "20": 3,
+        "21": 5,
+        "22": 2,
+        "23": 10,
+        "24": 8,
+        "25": 10,
+        "26": 6,
+        "27": 6,
+        "28": 10,
+        "29": 15,
+        "30": 20,
+        "31": 38,
+        "32": 55,
+        "33": 29,
+        "34": 27,
+        "35": 60,
+        "36": 64,
+        "37": 87,
+        "38": 64,
+        "39": 124,
+        "40": 164,
+        "41": 220,
+        "42": 308,
+        "43": 410,
+        "44": 536,
+        "45": 659,
+        "46": 547,
+        "47": 511,
+        "48": 441,
+        "49": 474,
+        "50": 446,
+        "51": 601,
+        "52": 715,
+        "53": 781,
+        "54": 544,
+        "55": 426,
+        "56": 389,
+        "57": 134,
+        "58": 115,
+        "59": 107,
+        "60": 93,
+        "61": 124,
+        "62": 79,
+        "63": 84,
+        "64": 71,
+        "65": 39,
+        "66": 32,
+        "67": 22,
+        "68": 10,
+        "69": 11,
+        "70": 6,
+        "71": 5,
+        "72": 7,
+        "73": 4,
+        "74": 6,
+        "75": 1,
+        "76": 2,
+        "77": 2,
+        "78": 2,
+        "79": 1,
+        "80": 3,
+        "81": 2,
+        "82": 1,
+        "83": 4,
+        "84": 2,
+        "85": 1,
+        "86": 1,
+        "87": 1,
+        "89": 2,
+        "90": 3,
+        "91": 11,
+        "92": 16,
+        "93": 5,
+        "94": 6,
+        "95": 3,
+        "96": 12,
+        "97": 12,
+        "98": 30,
+        "99": 33,
+        "100": 22,
+        "101": 17,
+        "102": 4,
+        "103": 5,
+        "104": 10,
+        "105": 2,
+        "106": 2,
+        "107": 4,
+        "108": 4,
+        "109": 2
+      },
+      "same_customer_overlap_pairs_including_duplicate_rows": 0,
+      "pairwise_overlap_days_not_union": 0,
+      "overlap_customers": 0,
+      "internal_union_gap_days": 0,
+      "gap_customers": 0,
+      "adjacent_distinct_interval_start_minus_previous_end_days": {
+        "1": 2819
+      },
+      "customers_with_attribute_changes": {
+        "ConsumptionType": 0,
+        "UnitCount": 0,
+        "Capacity": 0
+      },
+      "target": {
+        "start": "2025-01-20",
+        "end": "2025-03-20",
+        "days_per_customer": 60,
+        "inclusive_endpoint_assumption": {
+          "customers": {
+            "fully_covered": 2660,
+            "partially_covered": 4518,
+            "uncovered": 3
+          },
+          "covered_customer_days_by_class": {
+            "fully_covered": 159600,
+            "partially_covered": 192757,
+            "uncovered": 0
+          },
+          "uncovered_customer_days_by_class": {
+            "fully_covered": 0,
+            "partially_covered": 78323,
+            "uncovered": 180
+          },
+          "covered_customer_days": 352357,
+          "uncovered_customer_days": 78503,
+          "potential_customer_days": 430860
+        },
+        "alternative_from_inclusive_to_exclusive": {
+          "customers": {
+            "partially_covered": 6970,
+            "fully_covered": 207,
+            "uncovered": 4
+          },
+          "covered_customer_days": 347532,
+          "uncovered_customer_days": 83328
+        }
+      }
+    }
+  },
+  "pilot_comparison": {
+    "pilot_is_exact_first_n_full_rows": true,
+    "pilot_row_count": 10000,
+    "pilot_customer_count": 7181,
+    "full_customer_count": 362660,
+    "full_ids_nondecreasing_lexicographic": true,
+    "pilot_ids_nondecreasing_lexicographic": true,
+    "pilot_contains_all_full_bills_for_its_customers": true
+  },
+  "weather": {
+    "metadata": {
+      "latitude": "34.411247",
+      "longitude": "50.490566",
+      "elevation": "1435.0",
+      "utc_offset_seconds": "0",
+      "timezone": "GMT",
+      "timezone_abbreviation": "GMT"
+    },
+    "metadata_rows": 2,
+    "blank_separator_rows": 1,
+    "header_line_1_based": 4,
+    "headers": [
+      "time",
+      "temperature_2m (°C)",
+      "apparent_temperature (°C)",
+      "wind_speed_10m (km/h)"
+    ],
+    "column_types": {
+      "time": "naive ISO datetime, explicitly interpreted as UTC",
+      "temperature_2m (°C)": "finite decimal numeric",
+      "apparent_temperature (°C)": "finite decimal numeric",
+      "wind_speed_10m (km/h)": "finite decimal numeric"
+    },
+    "units": {
+      "temperature_2m (°C)": "degrees Celsius",
+      "apparent_temperature (°C)": "degrees Celsius",
+      "wind_speed_10m (km/h)": "km/h"
+    },
+    "timestamps_strictly_increasing_in_source_order": true,
+    "timestamps_on_hour": true,
+    "row_count": 2880,
+    "time_parse_failures": 0,
+    "timestamp_assumption": "GMT metadata and zero utc_offset_seconds imply UTC; timestamps carry no explicit offset",
+    "utc_range": [
+      "2025-01-01T00:00:00+00:00",
+      "2025-04-30T23:00:00+00:00"
+    ],
+    "local_timestamp_range": [
+      "2025-01-01T03:30:00+03:30",
+      "2025-05-01T02:30:00+03:30"
+    ],
+    "duplicate_timestamp_excess_rows": 0,
+    "missing_internal_hours_count": 0,
+    "missing_internal_hours_utc": [],
+    "non_hourly_step_pairs": 0,
+    "missing_or_invalid_numeric_values": {
+      "temperature_2m (°C)": 0,
+      "apparent_temperature (°C)": 0,
+      "wind_speed_10m (km/h)": 0
+    },
+    "all_bill_interval_requirement": {
+      "local_date_envelope": [
+        "2025-01-02",
+        "2025-04-29"
+      ],
+      "local_day_boundary_utc": [
+        "2025-01-01T20:30:00+00:00",
+        "2025-04-29T20:30:00+00:00"
+      ],
+      "required_hourly_point_brackets_utc": [
+        "2025-01-01T20:00:00+00:00",
+        "2025-04-29T21:00:00+00:00"
+      ],
+      "required_hourly_points_envelope": 2834,
+      "absent_required_hourly_points": 0,
+      "absent_required_timestamps_utc": [],
+      "complete_local_days_by_timestamps": 118,
+      "incomplete_local_dates_by_timestamps": [],
+      "note": "Envelope includes dates between bills; point-bracket convention is provisional pending observation aggregation semantics."
+    },
+    "target_intersecting_bill_requirement": {
+      "local_date_envelope": [
+        "2025-01-02",
+        "2025-04-29"
+      ],
+      "local_day_boundary_utc": [
+        "2025-01-01T20:30:00+00:00",
+        "2025-04-29T20:30:00+00:00"
+      ],
+      "required_hourly_point_brackets_utc": [
+        "2025-01-01T20:00:00+00:00",
+        "2025-04-29T21:00:00+00:00"
+      ],
+      "required_hourly_points_envelope": 2834,
+      "absent_required_hourly_points": 0,
+      "absent_required_timestamps_utc": [],
+      "complete_local_days_by_timestamps": 118,
+      "incomplete_local_dates_by_timestamps": [],
+      "note": "Envelope includes dates between bills; point-bracket convention is provisional pending observation aggregation semantics."
+    },
+    "target_only_requirement": {
+      "local_date_envelope": [
+        "2025-01-20",
+        "2025-03-20"
+      ],
+      "local_day_boundary_utc": [
+        "2025-01-19T20:30:00+00:00",
+        "2025-03-20T20:30:00+00:00"
+      ],
+      "required_hourly_point_brackets_utc": [
+        "2025-01-19T20:00:00+00:00",
+        "2025-03-20T21:00:00+00:00"
+      ],
+      "required_hourly_points_envelope": 1442,
+      "absent_required_hourly_points": 0,
+      "absent_required_timestamps_utc": [],
+      "complete_local_days_by_timestamps": 60,
+      "incomplete_local_dates_by_timestamps": [],
+      "note": "Envelope includes dates between bills; point-bracket convention is provisional pending observation aggregation semantics."
+    }
+  },
+  "pdf": {
+    "pages": 28,
+    "metadata": {
+      "/Author": "Colin O. Quinn, Ronald H. Brown, George F. Corliss and Richard J. Povinelli",
+      "/CreationDate": "D:20250201194507+08'00'",
+      "/Creator": "LaTeX with hyperref",
+      "/Keywords": "time series disaggregation; gas consumption disaggregation; nonuniform sampling; constrained redistribution; time series forecasting; multi-source; load shifting",
+      "/ModDate": "D:20260520075945+03'30'",
+      "/Producer": "pdfTeX-1.40.25",
+      "/Subject": "Accurate time series forecasting often requires higher temporal resolution than that provided by available data, such as when daily forecasts are needed from monthly data. Existing temporal disaggregation techniques, which typically handle only single, uniformly sampled time series, have limited applicability in real-world, multi-source scenarios. This paper introduces the Iterative Shifting Disaggregation (ISD) algorithm, designed to process and disaggregate time series derived from sensor-sourced low-frequency measurements, transforming multiple, nonuniformly sampled sensor data streams into a single, coherent high-frequency signal. ISD operates in an iterative, two-phase process: a prediction phase that uses multiple linear regression to generate high-frequency series from low-frequency data and correlated variables, followed by an update phase that redistributes low-frequency observations across high-frequency periods. This process repeats, refining estimates with each iteration cycle. The ISD algorithm’s key contribution is its ability to disaggregate multiple, nonuniformly spaced time series with overlapping intervals into a single daily representation. In two case studies using natural gas data, ISD successfully disaggregates billing cycle and grouped residential customer data into daily time series, achieving a 1.4–4.3% WMAPE improvement for billing cycle data and a 4.6–10.4% improvement for residential data over existing methods.",
+      "/Title": "An Iterative Shifting Disaggregation Algorithm for Multi-Source, Irregularly Sampled, and Overlapped Time Series"
+    },
+    "first_page_title": "An Iterative Shifting Disaggregation Algorithm for Multi-Source, Irregularly Sampled, and Overlapped Time Series",
+    "scope": "Reference identity/metadata inspected. Solver and paper implementation not audited."
+  },
+  "machine": {
+    "python_executable": "C:\\Users\\Masoud\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+    "python_version": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "hardware": [
+      {
+        "TotalPhysicalMemory": 16780775424,
+        "NumberOfLogicalProcessors": 12
+      },
+      {
+        "Name": "Intel(R) Core(TM) 5 210H",
+        "NumberOfCores": 8,
+        "NumberOfLogicalProcessors": 12
+      },
+      {
+        "Caption": "Microsoft Windows 11 Home",
+        "FreePhysicalMemory": 3408480
+      }
+    ],
+    "memory_guidance": "Audit uses string records and interval unions; avoid a dense customer-by-day matrix. A 362660 x 60 float64 array alone needs 174076800 bytes; Python objects and full-interval arrays add overhead. Free memory is a snapshot."
+  },
+  "raw_data_mutated": false,
+  "assumptions": [
+    "Inclusive bill endpoints remain provisional.",
+    "Target coverage is union of valid intervals; it does not establish consumption validity or solver eligibility.",
+    "All observed customer IDs, including invalid-record-only customers, form coverage denominator.",
+    "Gaps are internal uncovered calendar days between valid interval unions; no missing bills inferred beyond each customer observed span.",
+    "Exact duplicates and overlap pairs are reported before any correction; no records removed.",
+    "Conflicts use (customer, FromDate, ToDate) with differing remaining columns."
+  ]
+}

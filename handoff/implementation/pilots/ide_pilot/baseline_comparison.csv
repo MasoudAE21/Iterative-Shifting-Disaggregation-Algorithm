@@ -1,0 +1,3 @@
+baseline,target_aggregate_mean_absolute_difference,target_aggregate_max_absolute_difference,target_baseline_total_source_units,target_pipeline_total_source_units,interpretation
+uniform,1063.284258077178,3414.4850148746173,727536.9787931996,737461.674237497,"Shape difference, not measured error; no independent daily truth"
+weather_weighted_baseload1_hdd65,2415.1039082303264,8518.407600176764,800339.2100409303,737461.674237497,"Shape difference, not measured error; no independent daily truth"

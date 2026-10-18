@@ -1,0 +1,38 @@
+         469652068 function calls (461649926 primitive calls) in 212.384 seconds
+
+   Ordered by: cumulative time
+   List reduced from 1876 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+4480/4479    2.996    0.001  497.797    0.111 threading.py:637(wait)
+17924/17915    2.597    0.000  233.209    0.013 {method 'acquire' of '_thread.lock' objects}
+        1    0.000    0.000  212.410  212.410 pipeline.py:169(run)
+        1    0.000    0.000  212.396  212.396 pipeline.py:25(__exit__)
+        1    0.000    0.000  212.396  212.396 threading.py:1117(join)
+        1    0.000    0.000  212.396  212.396 threading.py:1155(_wait_for_tstate_lock)
+        1    0.000    0.000  212.396  212.396 threading.py:1018(_bootstrap)
+        1    0.000    0.000  212.396  212.396 threading.py:1058(_bootstrap_inner)
+4480/4479    2.079    0.000  124.187    0.028 threading.py:323(wait)
+   362762    0.279    0.000  108.372    0.000 ops.py:615(get_iterator)
+   362762    0.405    0.000  106.804    0.000 ops.py:1247(__iter__)
+   362760    4.947    0.000  106.250    0.000 ops.py:1276(_chop)
+  7980724    6.537    0.000   93.131    0.000 blocks.py:2081(slice_block_rows)
+  7257998   20.072    0.000   83.438    0.000 array.py:722(__getitem__)
+   725325    1.669    0.000   59.078    0.000 generic.py:6360(astype)
+   725325    0.555    0.000   38.392    0.000 managers.py:610(astype)
+   725344    2.222    0.000   37.818    0.000 managers.py:396(apply)
+  6529943    4.621    0.000   37.762    0.000 string_arrow.py:161(_from_pyarrow_array)
+   725557    0.888    0.000   34.729    0.000 generic.py:6191(__getattr__)
+  6529965   15.057    0.000   32.482    0.000 string_arrow.py:133(__init__)
+   725327    1.747    0.000   31.798    0.000 blocks.py:578(astype)
+   725423    1.812    0.000   24.584    0.000 frame.py:4337(__getitem__)
+   725327    1.035    0.000   24.150    0.000 astype.py:194(astype_array_safe)
+   725417    0.571    0.000   20.413    0.000 frame.py:4966(_get_item)
+  7980929   10.603    0.000   19.747    0.000 utils.py:416(getitem_returns_view)
+   728144    0.563    0.000   19.171    0.000 frame.py:4292(_ixs)
+   725327    1.496    0.000   17.796    0.000 astype.py:160(astype_array)
+   725325    2.884    0.000   14.921    0.000 masked.py:646(astype)
+   728144    1.039    0.000   12.561    0.000 frame.py:4954(_box_col_values)
+  3626848    5.041    0.000   12.000    0.000 common.py:1821(pandas_dtype)
+
+

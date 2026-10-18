@@ -1,0 +1,98 @@
+{
+  "outputs": {
+    "pilot_100": {
+      "customers": 100,
+      "bills": 130,
+      "bill_days": 6490,
+      "target_rows": 6000,
+      "target_nulls": 1325,
+      "recorded_zero_target_rows": 287,
+      "source_fingerprint_matches": false,
+      "raw_input_hashes_match": true,
+      "all_export_checks_passed": true,
+      "mathematical_pipeline_and_test_source_matches": true,
+      "auxiliary_packager_only_changed": true
+    },
+    "pilot_500": {
+      "customers": 500,
+      "bills": 708,
+      "bill_days": 35472,
+      "target_rows": 30000,
+      "target_nulls": 5330,
+      "recorded_zero_target_rows": 1085,
+      "source_fingerprint_matches": false,
+      "raw_input_hashes_match": true,
+      "all_export_checks_passed": true,
+      "mathematical_pipeline_and_test_source_matches": true,
+      "auxiliary_packager_only_changed": true
+    },
+    "pilot_2000": {
+      "customers": 2000,
+      "bills": 2841,
+      "bill_days": 142087,
+      "target_rows": 120000,
+      "target_nulls": 20754,
+      "recorded_zero_target_rows": 4942,
+      "source_fingerprint_matches": false,
+      "raw_input_hashes_match": true,
+      "all_export_checks_passed": true,
+      "mathematical_pipeline_and_test_source_matches": true,
+      "auxiliary_packager_only_changed": true
+    },
+    "pilot_10000": {
+      "customers": 10000,
+      "bills": 14148,
+      "bill_days": 710687,
+      "target_rows": 600000,
+      "target_nulls": 104146,
+      "recorded_zero_target_rows": 21021,
+      "source_fingerprint_matches": false,
+      "raw_input_hashes_match": true,
+      "all_export_checks_passed": true,
+      "mathematical_pipeline_and_test_source_matches": true,
+      "auxiliary_packager_only_changed": true
+    },
+    "cohort_pilot_10000": {
+      "customers": 10000,
+      "bills": 19320,
+      "bill_days": 986415,
+      "target_rows": 600000,
+      "target_nulls": 0,
+      "recorded_zero_target_rows": 24808,
+      "source_fingerprint_matches": false,
+      "raw_input_hashes_match": true,
+      "all_export_checks_passed": true,
+      "mathematical_pipeline_and_test_source_matches": true,
+      "auxiliary_packager_only_changed": true
+    },
+    "paper_reference_100": {
+      "customers": 100,
+      "bills": 130,
+      "bill_days": 6490,
+      "target_rows": 6000,
+      "target_nulls": 1325,
+      "recorded_zero_target_rows": 287,
+      "source_fingerprint_matches": false,
+      "raw_input_hashes_match": true,
+      "all_export_checks_passed": true,
+      "mathematical_pipeline_and_test_source_matches": true,
+      "auxiliary_packager_only_changed": true
+    },
+    "ide_pilot": {
+      "customers": 1000,
+      "bills": 1432,
+      "bill_days": 71682,
+      "target_rows": 60000,
+      "target_nulls": 10254,
+      "recorded_zero_target_rows": 2467,
+      "source_fingerprint_matches": false,
+      "raw_input_hashes_match": true,
+      "all_export_checks_passed": true,
+      "mathematical_pipeline_and_test_source_matches": true,
+      "auxiliary_packager_only_changed": true
+    }
+  },
+  "raw_inputs_unchanged": true,
+  "full_production_run": false,
+  "packaging_only_source_change": "scripts/package_review.py; documented in packaging_version_note.json"
+}

@@ -1,0 +1,55 @@
+{
+  "final_bundle_source_sha256": "c8253982ae18c6a7c5ec403cdbe7e4851b5d2b9e298a64690c19945db768367f",
+  "runs": {
+    "pilot_100": {
+      "source_sha256_at_execution": "e187ffc76738db5684ae6e83d7094deabbbc0ab6fc4b3b6eec7f7dd77cc76d6b",
+      "changed_files_after_execution": [
+        "scripts/package_review.py"
+      ],
+      "mathematical_pipeline_and_test_source_unchanged": true
+    },
+    "pilot_500": {
+      "source_sha256_at_execution": "e187ffc76738db5684ae6e83d7094deabbbc0ab6fc4b3b6eec7f7dd77cc76d6b",
+      "changed_files_after_execution": [
+        "scripts/package_review.py"
+      ],
+      "mathematical_pipeline_and_test_source_unchanged": true
+    },
+    "pilot_2000": {
+      "source_sha256_at_execution": "e187ffc76738db5684ae6e83d7094deabbbc0ab6fc4b3b6eec7f7dd77cc76d6b",
+      "changed_files_after_execution": [
+        "scripts/package_review.py"
+      ],
+      "mathematical_pipeline_and_test_source_unchanged": true
+    },
+    "pilot_10000": {
+      "source_sha256_at_execution": "e187ffc76738db5684ae6e83d7094deabbbc0ab6fc4b3b6eec7f7dd77cc76d6b",
+      "changed_files_after_execution": [
+        "scripts/package_review.py"
+      ],
+      "mathematical_pipeline_and_test_source_unchanged": true
+    },
+    "cohort_pilot_10000": {
+      "source_sha256_at_execution": "e187ffc76738db5684ae6e83d7094deabbbc0ab6fc4b3b6eec7f7dd77cc76d6b",
+      "changed_files_after_execution": [
+        "scripts/package_review.py"
+      ],
+      "mathematical_pipeline_and_test_source_unchanged": true
+    },
+    "paper_reference_100": {
+      "source_sha256_at_execution": "e187ffc76738db5684ae6e83d7094deabbbc0ab6fc4b3b6eec7f7dd77cc76d6b",
+      "changed_files_after_execution": [
+        "scripts/package_review.py"
+      ],
+      "mathematical_pipeline_and_test_source_unchanged": true
+    },
+    "ide_pilot": {
+      "source_sha256_at_execution": "e187ffc76738db5684ae6e83d7094deabbbc0ab6fc4b3b6eec7f7dd77cc76d6b",
+      "changed_files_after_execution": [
+        "scripts/package_review.py"
+      ],
+      "mathematical_pipeline_and_test_source_unchanged": true
+    }
+  },
+  "reason": "Packaging-only fix excludes the old inventory before regenerating it and checks unique ZIP names. No solver/import/weather/export/test code changed after final pilot validation."
+}

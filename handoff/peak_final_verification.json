@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "full_bill_rows_reconciled_from_daily_parquet": 513921,
+  "maximum_bill_error": 3.637978807091713e-12,
+  "zero_bills_checked": 21705,
+  "distinct_input_and_csv_customers": 362660,
+  "missing_values": 47309,
+  "retained_zero_values": 12927,
+  "same_day_values_exactly_match": true,
+  "independent_math_fsum_peak_date": "2025-02-10",
+  "independent_math_fsum_peak_total": 2183460.535366701,
+  "fixed_population_customers": 143859,
+  "source_hashes_match_final_run": true,
+  "artifact_sha256": {
+    "customer_peak_consumption.csv": "89d25ceabe315697467e842903107350b978e56dbbcf28752c1040c194ba62ec",
+    "peak_daily_totals.csv": "380033c91a12cb63171efee44688ab4c1f591ee1c74db6fccc1e701907f20494",
+    "peak_missing_reasons.csv": "fe050dcdd2dd7c99e3ca9c3de4ea8f324f23a1f6fbbc8ed9ad0913a35fa28178",
+    "run_manifest.json": "80170e811cf835387c23ea05709081334cae86a79f51055e5c2d3ff25acf3cae"
+  },
+  "output_sizes_bytes": {
+    "aggregate_daily.parquet": 21691,
+    "aggregate_daily_summary.csv": 26331,
+    "baseline_comparison.csv": 503,
+    "bill_reconciliation.parquet": 30230249,
+    "checkpoint.npz": 227235768,
+    "customer_peak_consumption.csv": 10054765,
+    "daily_weather.parquet": 14469,
+    "full_bill_daily.parquet": 149141438,
+    "iteration_summary.csv": 2075,
+    "normalized_bills.parquet": 45410715,
+    "peak_daily_totals.csv": 2324,
+    "peak_missing_reasons.csv": 1324679,
+    "peak_summary.md": 9136,
+    "run_manifest.json": 50689,
+    "run_summary.csv": 413,
+    "target_customer_daily.parquet": 99186183
+  },
+  "available_disk_bytes": 325585862656,
+  "verification_seconds": 27.987908099996275
+}

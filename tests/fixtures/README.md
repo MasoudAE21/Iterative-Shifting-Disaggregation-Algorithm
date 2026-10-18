@@ -1,0 +1,1 @@
+Bill IDs replaced with CUSTOMER labels, all selected histories retained; deliberate examples, not representative. Weather metadata/boundary rows are preserved; omitted middle rows are deliberate sample gaps. Use explicit allow_sample=True for bill fixture ingestion. Neither fixture is a production input.

@@ -1,0 +1,15 @@
+/data/
+/outputs/
+/output/
+/bulk_outputs/
+/.venv/
+/venv/
+__pycache__/
+*.py[cod]
+/.cache/
+/.env
+/.env.*
+/.pytest_cache/
+*.nbc
+*.nbi
+*.memmap

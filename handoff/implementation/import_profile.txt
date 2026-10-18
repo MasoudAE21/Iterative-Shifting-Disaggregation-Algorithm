@@ -1,0 +1,33 @@
+         4093156 function calls (4085297 primitive calls) in 3.866 seconds
+
+   Ordered by: cumulative time
+   List reduced from 1181 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      102    0.054    0.001    6.790    0.067 threading.py:637(wait)
+      101    0.145    0.001    4.162    0.041 threading.py:323(wait)
+      407    1.044    0.003    2.028    0.005 {method 'acquire' of '_thread.lock' objects}
+        7    0.000    0.000    0.487    0.070 readers.py:1864(__next__)
+       14    0.000    0.000    0.484    0.035 indexing.py:917(__setitem__)
+       14    0.000    0.000    0.482    0.034 indexing.py:1889(_setitem_with_indexer)
+       14    0.000    0.000    0.482    0.034 indexing.py:1957(_setitem_with_indexer_split_path)
+       14    0.000    0.000    0.480    0.034 indexing.py:2122(_setitem_single_column)
+       14    0.000    0.000    0.478    0.034 managers.py:1491(column_setitem)
+       32    0.000    0.000    0.442    0.014 managers.py:1259(iset)
+       32    0.000    0.000    0.442    0.014 managers.py:1461(_iset_single)
+        6    0.000    0.000    0.375    0.063 data.py:35(normalize_frame)
+       14    0.000    0.000    0.349    0.025 blocks.py:1960(set_inplace)
+        1    0.005    0.005    0.346    0.346 data.py:98(read_bills)
+        1    0.021    0.021    0.341    0.341 data.py:66(audit_normalized)
+       28    0.057    0.002    0.339    0.012 string_arrow.py:278(_maybe_convert_setitem_value)
+      102    0.000    0.000    0.303    0.003 accessor.py:134(wrapper)
+      228    0.277    0.001    0.280    0.001 string_arrow.py:194(_from_sequence)
+       24    0.210    0.009    0.232    0.010 numeric.py:50(to_numeric)
+       60    0.000    0.000    0.224    0.004 _arrow_string_mixins.py:357(_str_contains)
+   513922    0.221    0.000    0.221    0.000 {method 'hexdigest' of '_hashlib.HASH' objects}
+       28    0.000    0.000    0.217    0.008 array.py:2446(_maybe_convert_setitem_value)
+        7    0.000    0.000    0.217    0.031 readers.py:2002(get_chunk)
+        7    0.000    0.000    0.217    0.031 readers.py:1931(read)
+       18    0.001    0.000    0.210    0.012 algorithms.py:652(factorize)
+
+

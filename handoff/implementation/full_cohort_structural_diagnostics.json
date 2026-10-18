@@ -1,0 +1,14 @@
+{
+  "structural_candidate_customers": 143859,
+  "cohort_bills": 278322,
+  "H_cohort": 14194952,
+  "allocation_values_float64_bytes": 113559616,
+  "cohort_bill_consumption_source_units_unknown": 145863569.0,
+  "recorded_zero_cohort_bills": 11096,
+  "all_full_source_bills": 513921,
+  "all_full_source_bill_days": 25771767,
+  "support_min_on_full_domain": 3835,
+  "support_max_on_full_domain": 143859,
+  "support_all_60_target_days": 143859,
+  "scope": "Structural workload/coverage scan only; full cohort solver and full production were not run"
+}

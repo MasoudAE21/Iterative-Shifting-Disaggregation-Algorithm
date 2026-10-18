@@ -1,0 +1,33 @@
+         469502526 function calls (461516159 primitive calls) in 210.775 seconds
+
+   Ordered by: cumulative time
+   List reduced from 1139 to 25 due to restriction <25>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     4474    3.056    0.001  509.956    0.114 threading.py:637(wait)
+   362663    0.265    0.000  106.419    0.000 ops.py:615(get_iterator)
+   362663    0.395    0.000  103.811    0.000 ops.py:1247(__iter__)
+   362661    4.961    0.000  103.277    0.000 ops.py:1276(_chop)
+     4473    1.618    0.000  102.216    0.023 threading.py:323(wait)
+  7978542    6.381    0.000   91.802    0.000 blocks.py:2081(slice_block_rows)
+  7253881   20.092    0.000   82.388    0.000 array.py:722(__getitem__)
+   725362    1.669    0.000   58.690    0.000 generic.py:6360(astype)
+   725356    0.554    0.000   38.189    0.000 managers.py:610(astype)
+   725607    2.237    0.000   37.665    0.000 managers.py:396(apply)
+  6528695    4.616    0.000   37.295    0.000 string_arrow.py:161(_from_pyarrow_array)
+   725902    0.895    0.000   34.424    0.000 generic.py:6191(__getattr__)
+  6528923   14.839    0.000   32.039    0.000 string_arrow.py:133(__init__)
+   725356    1.755    0.000   31.634    0.000 blocks.py:578(astype)
+   725582    1.797    0.000   24.300    0.000 frame.py:4337(__getitem__)
+   725356    1.023    0.000   24.026    0.000 astype.py:194(astype_array_safe)
+    17895    2.858    0.000   21.891    0.001 {method 'acquire' of '_thread.lock' objects}
+   725581    0.557    0.000   20.197    0.000 frame.py:4966(_get_item)
+  7978983   10.424    0.000   19.311    0.000 utils.py:416(getitem_returns_view)
+   725635    0.552    0.000   18.919    0.000 frame.py:4292(_ixs)
+   725356    1.482    0.000   17.745    0.000 astype.py:160(astype_array)
+   725524    2.906    0.000   14.879    0.000 masked.py:646(astype)
+   725635    0.995    0.000   12.393    0.000 frame.py:4954(_box_col_values)
+  3629145    5.000    0.000   11.893    0.000 common.py:1821(pandas_dtype)
+121507762/121506354   11.159    0.000   11.165    0.000 {built-in method builtins.isinstance}
+
+

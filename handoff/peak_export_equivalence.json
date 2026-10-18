@@ -1,0 +1,18 @@
+{
+  "full_bill_daily.parquet": {
+    "rows": 71682,
+    "exact_semantic_equality": true
+  },
+  "target_customer_daily.parquet": {
+    "rows": 60000,
+    "exact_semantic_equality": true
+  },
+  "bill_reconciliation.parquet": {
+    "rows": 1432,
+    "exact_semantic_equality": true
+  },
+  "aggregate_daily.parquet": {
+    "rows": 118,
+    "exact_semantic_equality": true
+  }
+}

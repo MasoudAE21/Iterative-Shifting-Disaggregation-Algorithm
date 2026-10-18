@@ -1,0 +1,13 @@
+{
+  "customers": 100,
+  "bills": 198,
+  "interval_days": 9882,
+  "same_mode": "provisional_cohort_isd",
+  "same_features": "winter_hdd65_v1",
+  "same_fit_mask_and_exposure": true,
+  "reference_seconds_profiled": 1.83306359999915,
+  "scaled_seconds_warm": 0.018339099999138853,
+  "max_allocation_absolute_difference": 0.0,
+  "max_aggregate_absolute_difference": 0.0,
+  "passed": true
+}

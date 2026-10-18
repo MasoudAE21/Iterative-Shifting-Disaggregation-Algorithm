@@ -1,0 +1,7 @@
+{
+  "tests": 32,
+  "failures": 0,
+  "errors": 0,
+  "seconds": 3.691,
+  "source": "pytest JUnit XML, includes synthetic, pseudonymized real fixture and end-to-end tests"
+}

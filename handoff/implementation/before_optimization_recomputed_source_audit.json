@@ -1,0 +1,25 @@
+{
+  "audit": {
+    "rows": 513921,
+    "customers": 362660,
+    "record_status_counts": {
+      "accepted": 513921
+    },
+    "volume_ledger_source_units": {
+      "accepted": 280570629.0
+    },
+    "quarantined_customers": 0,
+    "exact_duplicate_excess_rows": 0,
+    "duplicate_confirmation": false,
+    "same_customer_overlap_pairs": 0,
+    "internal_gap_days_before_quarantine": 0,
+    "adjacent_pairs": 151261,
+    "zero_bill_rows": 21705,
+    "negative_rows": 0,
+    "invalid_rows": 0
+  },
+  "interval_days": 25771767,
+  "wall_seconds": 210.77533499999845,
+  "peak_rss_bytes": 565268480,
+  "source_sha256": "a40d065cf7bf0168c34443912318ad5f51e07b8af99a77c351191cbbe828f29d"
+}

@@ -1,0 +1,42 @@
+{
+  "wall_seconds": 215.84953099999984,
+  "peak_rss_bytes": 1531179008,
+  "peak": {
+    "date": "2025-02-10",
+    "total": 2183460.535366701,
+    "population_customers": 143859,
+    "output_customers": 362660,
+    "available_values": 315351,
+    "valid_zeros": 12927,
+    "missing_values": 47309,
+    "missing_reasons": {
+      "no_target_bill": 47309
+    },
+    "top_five": [
+      {
+        "date": "2025-02-10",
+        "total": 2183460.535366701
+      },
+      {
+        "date": "2025-02-25",
+        "total": 2112922.7718999404
+      },
+      {
+        "date": "2025-02-11",
+        "total": 2080322.8789625876
+      },
+      {
+        "date": "2025-02-09",
+        "total": 2021471.967862353
+      },
+      {
+        "date": "2025-02-26",
+        "total": 1952741.5290295726
+      }
+    ],
+    "csv_population_sum": 2183460.535366701,
+    "csv_integrity_passed": true,
+    "rounding": "Shortest round-trip float64 decimal (Python repr); no fixed decimal rounding. Compensated float64 totals select the peak before export.",
+    "policy": "Fixed full-target valid-billing population; exact ties choose earliest date. All output customers use that same date."
+  }
+}

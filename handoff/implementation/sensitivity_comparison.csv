@@ -1,0 +1,8 @@
+experiment,target_aggregate_mean_absolute_difference_from_default,target_aggregate_max_absolute_difference_from_default,full_aggregate_max_absolute_difference_from_default,fallback_reason,interpretation
+alpha_001,506.997045189428,1322.62388765164,1322.62388765164,,"Sensitivity, not measured error or calibrated uncertainty"
+alpha_005,0.0,0.0,0.0,,"Sensitivity, not measured error or calibrated uncertainty"
+alpha_010,105.90599373534232,276.4815450779097,276.4815450779097,,"Sensitivity, not measured error or calibrated uncertainty"
+loops_5,219.01188823715614,571.6371455034132,571.6371455034132,,"Sensitivity, not measured error or calibrated uncertainty"
+loops_20,93.95519116679101,245.28333972353357,245.28333972353357,,"Sensitivity, not measured error or calibrated uncertainty"
+boundary_unscaled,1552.6713812155322,2123.932540600039,12938.04730893978,,"Sensitivity, not measured error or calibrated uncertainty"
+wind_feature,188.8351716807326,1225.9597703300205,1225.9597703300205,,"Sensitivity, not measured error or calibrated uncertainty"

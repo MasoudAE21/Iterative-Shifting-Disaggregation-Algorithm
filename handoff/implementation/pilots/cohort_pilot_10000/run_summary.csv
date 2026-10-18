@@ -1,0 +1,2 @@
+customers,bills,model_customers,model_bills,allocated_interval_days,model_interval_days,wall_seconds,peak_rss_bytes,import_audit_seconds,population_seconds,weather_seconds,model_seconds,export_seconds
+10000,19320,10000,19320,986415,986415,18.964672199999768,824832000,6.000009307172149e-07,1.0929944000017713,0.014694199999212287,3.232203899999149,14.452688900000794

@@ -1,0 +1,16 @@
+{
+  "selected_date": "2025-02-10",
+  "rows": 362660,
+  "numeric": 315351,
+  "zeros": 12927,
+  "missing": 47309,
+  "combined_csv_sum": 4431655.946199017,
+  "combined_daily_aggregate": 4431655.946198997,
+  "absolute_difference": 1.955777406692505e-08,
+  "aggregate_comparison_atol": 1e-07,
+  "aggregate_comparison_rtol": 1e-10,
+  "csv_sha256": "89d25ceabe315697467e842903107350b978e56dbbcf28752c1040c194ba62ec",
+  "raw_input_ids_match": true,
+  "input_hashes_unchanged": true,
+  "missing_reasons_match": true
+}
