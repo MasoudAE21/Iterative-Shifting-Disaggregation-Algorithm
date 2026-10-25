@@ -13,21 +13,45 @@ EPS=np.finfo(np.float64).eps
 
 @dataclass
 class State:
+    """Bill constraints and storage layout, treated as fixed during solving.
+
+    starts indexes the shared daily timeline; offsets bounds each bill's slice
+    in the separate flattened allocation array. Allocations are not stored here.
+    """
+
     starts: np.ndarray
     lengths: np.ndarray
     totals: np.ndarray
     offsets: np.ndarray
     n_days: int
     identity_token: str = ""
+
     def validate(self):
-        if not (len(self.starts)==len(self.lengths)==len(self.totals)==len(self.offsets)-1): raise ValueError('State shape')
-        if np.any(self.starts<0) or np.any(self.lengths<=0) or np.any(self.starts+self.lengths>self.n_days): raise ValueError('Interval outside domain')
-        if not np.isfinite(self.totals).all() or np.any(self.totals<0): raise ValueError('Invalid total')
-        if not np.array_equal(np.diff(self.offsets),self.lengths) or self.offsets[0]!=0: raise ValueError('Offsets')
+        if not (
+            len(self.starts) == len(self.lengths) == len(self.totals)
+            == len(self.offsets) - 1
+        ):
+            raise ValueError('State shape')
+        if (
+            np.any(self.starts < 0)
+            or np.any(self.lengths <= 0)
+            or np.any(self.starts + self.lengths > self.n_days)
+        ):
+            raise ValueError('Interval outside domain')
+        if not np.isfinite(self.totals).all() or np.any(self.totals < 0):
+            raise ValueError('Invalid total')
+        if not np.array_equal(np.diff(self.offsets), self.lengths) or self.offsets[0] != 0:
+            raise ValueError('Offsets')
         return self
 
 @dataclass
 class Result:
+    """Solver allocations, aggregate profile and execution diagnostics.
+
+    y sums the per-bill allocations onto the shared daily timeline. prediction
+    is the last regression profile and need not reconcile to bill totals.
+    """
+
     allocations: np.ndarray
     y: np.ndarray
     prediction: np.ndarray
@@ -37,174 +61,432 @@ class Result:
     all_zero_fast_path: bool
     wall_seconds: float
 
-@njit(cache=True,fastmath=False)
+@njit(cache=True, fastmath=False)
 def sum_compensated(x):
-    total=0.0; correction=0.0
+    """Sum values in order while compensating for floating-point rounding."""
+    total = 0.0
+    correction = 0.0
     for value in x:
-        z=value-correction; nxt=total+z; correction=(nxt-total)-z; total=nxt
+        adjusted_value = value - correction
+        next_total = total + adjusted_value
+        correction = next_total - total - adjusted_value
+        total = next_total
     return total
 
-@njit(cache=True,fastmath=False)
-def aggregate_kernel(a,starts,lengths,offsets,n):
-    y=np.zeros(n); correction=np.zeros(n); count=np.zeros(n,np.int64)
-    for k in range(len(starts)):
-        for j in range(lengths[k]):
-            d=starts[k]+j; value=a[offsets[k]+j]; z=value-correction[d]
-            nxt=y[d]+z; correction[d]=(nxt-y[d])-z; y[d]=nxt; count[d]+=1
-    return y,count
+@njit(cache=True, fastmath=False)
+def aggregate_kernel(a, starts, lengths, offsets, n):
+    """Return daily sums and contribution counts from flattened bill allocations."""
+    daily_total = np.zeros(n)
+    daily_correction = np.zeros(n)
+    daily_count = np.zeros(n, np.int64)
+    for bill_index in range(len(starts)):
+        for day_offset in range(lengths[bill_index]):
+            day_index = starts[bill_index] + day_offset
+            value = a[offsets[bill_index] + day_offset]
+            adjusted_value = value - daily_correction[day_index]
+            next_total = daily_total[day_index] + adjusted_value
+            daily_correction[day_index] = next_total - daily_total[day_index] - adjusted_value
+            daily_total[day_index] = next_total
+            daily_count[day_index] += 1
+    return (daily_total, daily_count)
 
-def correct_roundoff(a,total,cfg):
-    delta=total-sum_compensated.py_func(a)
-    if abs(delta)>cfg.reconciliation_atol+cfg.reconciliation_rtol*abs(total): raise ArithmeticError('Correction exceeds reconciliation threshold')
-    k=int(np.argmax(a)); a[k]+=delta
-    if not np.isfinite(a).all() or np.any(a<0): raise ArithmeticError('Invalid corrected allocation')
+def correct_roundoff(a, total, cfg):
+    """Correct a small bill-sum discrepancy in place; return the same array."""
+    delta = total - sum_compensated.py_func(a)
+    if abs(delta) > cfg.reconciliation_atol + cfg.reconciliation_rtol * abs(total):
+        raise ArithmeticError('Correction exceeds reconciliation threshold')
+    largest_index = int(np.argmax(a))
+    a[largest_index] += delta
+    if not np.isfinite(a).all() or np.any(a < 0):
+        raise ArithmeticError('Invalid corrected allocation')
     return a
 
-def interval_update(old,y,p,total,cfg):
+def interval_update(old, y, p, total, cfg):
     """Hand-checkable Eq. 20-23 update, returning new, restored y, no-op flag."""
-    other=y-old
-    tol=64*EPS*np.maximum(1,np.maximum(np.abs(y),np.abs(old)))
-    if np.any(other < -tol): raise ArithmeticError('Aggregate minus bill is materially negative')
-    other=np.maximum(other,0)
-    if total==0: new=np.zeros_like(old); noop=False
+    other_contributions = y - old
+    subtraction_tolerance = 64 * EPS * np.maximum(1, np.maximum(np.abs(y), np.abs(old)))
+    if np.any(other_contributions < -subtraction_tolerance):
+        raise ArithmeticError('Aggregate minus bill is materially negative')
+    other_contributions = np.maximum(other_contributions, 0)
+    if total == 0:
+        new_allocation = np.zeros_like(old)
+        noop = False
     else:
-        e=np.maximum(p-other,0)
-        if not np.isfinite(e).all(): raise ArithmeticError('Nonfinite residual')
-        scale=max(1,float(np.max(np.abs(p))),float(np.max(np.abs(other))))
-        s=sum_compensated.py_func(e); threshold=64*EPS*len(e)*scale
-        noop=s<=threshold
-        if noop: new=old.copy()
+        residual = np.maximum(p - other_contributions, 0)
+        if not np.isfinite(residual).all():
+            raise ArithmeticError('Nonfinite residual')
+        scale = max(1, float(np.max(np.abs(p))), float(np.max(np.abs(other_contributions))))
+        residual_sum = sum_compensated.py_func(residual)
+        residual_threshold = 64 * EPS * len(residual) * scale
+        noop = residual_sum <= residual_threshold
+        if noop:
+            new_allocation = old.copy()
         else:
-            weights=e/np.max(e); z=total*(weights/sum_compensated.py_func(weights))
-            new=correct_roundoff((1-cfg.alpha)*old+cfg.alpha*z,total,cfg)
-    return new,other+new,noop
+            weights = residual / np.max(residual)
+            proposed_allocation = total * (weights / sum_compensated.py_func(weights))
+            new_allocation = correct_roundoff(
+                (1 - cfg.alpha) * old + cfg.alpha * proposed_allocation,
+                total,
+                cfg,
+            )
+    return (new_allocation, other_contributions + new_allocation, noop)
 
-def reference_sweep(a,y,p,state,cfg):
-    noops=0
-    for k in range(len(state.starts)):
-        d=int(state.starts[k]); l=int(state.lengths[k]); o=int(state.offsets[k])
-        new,restored,noop=interval_update(a[o:o+l].copy(),y[d:d+l],p[d:d+l],state.totals[k],cfg)
-        a[o:o+l]=new; y[d:d+l]=restored; noops+=noop
+def reference_sweep(a, y, p, state, cfg):
+    """Update bills sequentially in place; later bills see the latest aggregate."""
+    noops = 0
+    for bill_index in range(len(state.starts)):
+        day_start = int(state.starts[bill_index])
+        length = int(state.lengths[bill_index])
+        offset = int(state.offsets[bill_index])
+        (new_allocation, restored_aggregate, noop) = interval_update(
+            a[offset:offset + length].copy(),
+            y[day_start:day_start + length],
+            p[day_start:day_start + length],
+            state.totals[bill_index],
+            cfg,
+        )
+        a[offset:offset + length] = new_allocation
+        y[day_start:day_start + length] = restored_aggregate
+        noops += noop
     return int(noops)
 
-@njit(cache=True,fastmath=False)
-def scaled_sweep(a,y,p,starts,lengths,totals,offsets,alpha,atol,rtol):
-    noops=0
-    for k in range(len(starts)):
-        l=lengths[k]; d=starts[k]; o=offsets[k]; total=totals[k]
-        other=np.empty(l); e=np.empty(l); scale=1.0; maxe=0.0
-        for j in range(l):
-            old=a[o+j]; yy=y[d+j]; v=yy-old; tol=64*EPS*max(1.0,abs(yy),abs(old))
-            if v < -tol: raise ArithmeticError('Aggregate minus bill is materially negative')
-            other[j]=max(v,0.0); scale=max(scale,abs(p[d+j]),abs(other[j]))
-            e[j]=max(p[d+j]-other[j],0.0); maxe=max(maxe,e[j])
-            if not np.isfinite(e[j]): raise ArithmeticError('Nonfinite residual')
-        if total==0:
-            for j in range(l): a[o+j]=0.0; y[d+j]=other[j]
+@njit(cache=True, fastmath=False)
+def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol):
+    """Compiled sequential sweep matching the reference arithmetic order."""
+    noops = 0
+    for bill_index in range(len(starts)):
+        length = lengths[bill_index]
+        day_start = starts[bill_index]
+        offset = offsets[bill_index]
+        total = totals[bill_index]
+        other_contributions = np.empty(length)
+        residual = np.empty(length)
+        scale = 1.0
+        max_residual = 0.0
+        for day_offset in range(length):
+            old_allocation = a[offset + day_offset]
+            aggregate_value = y[day_start + day_offset]
+            other_value = aggregate_value - old_allocation
+            subtraction_tolerance = 64 * EPS * max(1.0, abs(aggregate_value), abs(old_allocation))
+            if other_value < -subtraction_tolerance:
+                raise ArithmeticError('Aggregate minus bill is materially negative')
+            other_contributions[day_offset] = max(other_value, 0.0)
+            scale = max(scale, abs(p[day_start + day_offset]), abs(other_contributions[day_offset]))
+            residual[day_offset] = max(p[day_start + day_offset] - other_contributions[day_offset], 0.0)
+            max_residual = max(max_residual, residual[day_offset])
+            if not np.isfinite(residual[day_offset]):
+                raise ArithmeticError('Nonfinite residual')
+        if total == 0:
+            for day_offset in range(length):
+                a[offset + day_offset] = 0.0
+                y[day_start + day_offset] = other_contributions[day_offset]
             continue
-        if sum_compensated(e)<=64*EPS*l*scale:
-            noops+=1
-            for j in range(l): y[d+j]=other[j]+a[o+j]
+        if sum_compensated(residual) <= 64 * EPS * length * scale:
+            noops += 1
+            for day_offset in range(length):
+                y[day_start + day_offset] = other_contributions[day_offset] + a[offset + day_offset]
             continue
-        for j in range(l): e[j]/=maxe
-        denom=sum_compensated(e)
-        for j in range(l): z=total*(e[j]/denom); a[o+j]=(1-alpha)*a[o+j]+alpha*z
-        delta=total-sum_compensated(a[o:o+l])
-        if abs(delta)>atol+rtol*abs(total): raise ArithmeticError('Correction exceeds threshold')
-        largest=0
-        for j in range(1,l):
-            if a[o+j]>a[o+largest]: largest=j
-        a[o+largest]+=delta
-        for j in range(l):
-            if not np.isfinite(a[o+j]) or a[o+j]<0: raise ArithmeticError('Invalid allocation')
-            y[d+j]=other[j]+a[o+j]
+        for day_offset in range(length):
+            residual[day_offset] /= max_residual
+        weight_sum = sum_compensated(residual)
+        for day_offset in range(length):
+            proposed_allocation = total * (residual[day_offset] / weight_sum)
+            a[offset + day_offset] = (1 - alpha) * a[offset + day_offset] + alpha * proposed_allocation
+        delta = total - sum_compensated(a[offset:offset + length])
+        if abs(delta) > atol + rtol * abs(total):
+            raise ArithmeticError('Correction exceeds threshold')
+        largest_index = 0
+        for day_offset in range(1, length):
+            if a[offset + day_offset] > a[offset + largest_index]:
+                largest_index = day_offset
+        a[offset + largest_index] += delta
+        for day_offset in range(length):
+            if not np.isfinite(a[offset + day_offset]) or a[offset + day_offset] < 0:
+                raise ArithmeticError('Invalid allocation')
+            y[day_start + day_offset] = other_contributions[day_offset] + a[offset + day_offset]
     return noops
 
-@njit(cache=True,fastmath=False)
-def conservation_kernel(a,totals,offsets,atol,rtol):
-    maximum=0.0
-    for k in range(len(totals)):
-        delta=abs(sum_compensated(a[offsets[k]:offsets[k+1]])-totals[k]); maximum=max(maximum,delta)
-        if delta>atol+rtol*abs(totals[k]): raise ArithmeticError('Bill conservation failure')
+@njit(cache=True, fastmath=False)
+def conservation_kernel(a, totals, offsets, atol, rtol):
+    """Check bill sums and allocation validity; return the largest discrepancy."""
+    max_discrepancy = 0.0
+    for bill_index in range(len(totals)):
+        discrepancy = abs(
+            sum_compensated(a[offsets[bill_index]:offsets[bill_index + 1]]) - totals[bill_index],
+        )
+        max_discrepancy = max(max_discrepancy, discrepancy)
+        if discrepancy > atol + rtol * abs(totals[bill_index]):
+            raise ArithmeticError('Bill conservation failure')
     for value in a:
-        if not np.isfinite(value) or value<0: raise ArithmeticError('Allocation invariant failure')
-    return maximum
+        if not np.isfinite(value) or value < 0:
+            raise ArithmeticError('Allocation invariant failure')
+    return max_discrepancy
 
-def initialize(state,cfg,storage=None):
-    size=int(state.offsets[-1])
-    if storage and size*8>cfg.memmap_threshold_mb*1024**2:
-        a=np.memmap(storage,dtype=np.float64,mode='w+',shape=(size,))
-    else: a=np.empty(size,dtype=np.float64)
-    for k,total in enumerate(state.totals):
-        o=int(state.offsets[k]); l=int(state.lengths[k]); a[o:o+l]=total/l
-        correct_roundoff(a[o:o+l],total,cfg)
-    return a
+def initialize(state, cfg, storage=None):
+    """Allocate each bill uniformly, optionally creating file-backed storage."""
+    size = int(state.offsets[-1])
+    if storage and size * 8 > cfg.memmap_threshold_mb * 1024**2:
+        allocations = np.memmap(storage, dtype=np.float64, mode='w+', shape=(size,))
+    else:
+        allocations = np.empty(size, dtype=np.float64)
+    for bill_index, total in enumerate(state.totals):
+        offset = int(state.offsets[bill_index])
+        length = int(state.lengths[bill_index])
+        allocations[offset:offset + length] = total / length
+        correct_roundoff(allocations[offset:offset + length], total, cfg)
+    return allocations
 
-def lstsq_diagnostics(X,y,mask,cfg):
-    fit=X[mask]; response=y[mask]; n,p=fit.shape
-    if n==0: raise AvailabilityError('fit_unavailable: No fit rows')
-    rcond=cfg.regression_rcond if cfg.regression_rcond is not None else max(n,p)*EPS
-    beta,_,rank,singular=np.linalg.lstsq(fit,response,rcond=rcond)
-    predicted=X@beta
-    if not np.isfinite(beta).all() or not np.isfinite(predicted).all(): raise ArithmeticError('Nonfinite OLS')
-    cond=float(singular[0]/singular[-1]) if rank==p else float('inf')
-    info={'rank':int(rank),'columns':p,'n_fit':n,'rcond':rcond,'singular_values':singular.tolist(),'condition_number':cond,'condition_number_infinite':not math.isfinite(cond),'residual_norm':float(np.linalg.norm(response-fit@beta)),'column_ranges':[[float(np.min(fit[:,j])),float(np.max(fit[:,j]))] for j in range(p)],'zero_columns':np.flatnonzero(np.all(fit==0,axis=0)).tolist(),'beta':beta.tolist()}
-    if cfg.mode=='provisional_cohort_isd' and (rank!=p or n<max(30,5*p) or cond>1e8): raise AvailabilityError('fit_unavailable: rank/count/condition gate')
-    return beta,predicted,info
+def lstsq_diagnostics(X, y, mask, cfg):
+    """Fit masked aggregate observations and predict over the full domain."""
+    fit_design = X[mask]
+    fit_response = y[mask]
+    n_fit, n_features = fit_design.shape
+    if n_fit == 0:
+        raise AvailabilityError('fit_unavailable: No fit rows')
+    rcond = cfg.regression_rcond if cfg.regression_rcond is not None else max(n_fit, n_features) * EPS
+    beta, _, rank, singular_values = np.linalg.lstsq(fit_design, fit_response, rcond=rcond)
+    predicted = X @ beta
+    if not np.isfinite(beta).all() or not np.isfinite(predicted).all():
+        raise ArithmeticError('Nonfinite OLS')
+    condition_number = float(singular_values[0] / singular_values[-1]) if rank == n_features else float('inf')
+    diagnostics = {
+        'rank': int(rank),
+        'columns': n_features,
+        'n_fit': n_fit,
+        'rcond': rcond,
+        'singular_values': singular_values.tolist(),
+        'condition_number': condition_number,
+        'condition_number_infinite': not math.isfinite(condition_number),
+        'residual_norm': float(np.linalg.norm(fit_response - fit_design @ beta)),
+        'column_ranges': [
+            [
+                float(np.min(fit_design[:, column_index])),
+                float(np.max(fit_design[:, column_index])),
+            ]
+            for column_index in range(n_features)
+        ],
+        'zero_columns': np.flatnonzero(np.all(fit_design == 0, axis=0)).tolist(),
+        'beta': beta.tolist(),
+    }
+    if cfg.mode == 'provisional_cohort_isd' and (
+        rank != n_features
+        or n_fit < max(30, 5 * n_features)
+        or condition_number > 1e8
+    ):
+        raise AvailabilityError('fit_unavailable: rank/count/condition gate')
+    return (beta, predicted, diagnostics)
 
-def state_lock(state,X,mask,cfg):
-    h=hashlib.sha256(); h.update(state.identity_token.encode())
-    for a in [state.starts,state.lengths,state.totals,state.offsets,X,mask]: h.update(np.ascontiguousarray(a).tobytes())
-    settings=cfg.as_dict(); settings.pop('resume'); settings.pop('checkpoint'); settings.pop('engine')
-    h.update(json.dumps(settings,sort_keys=True).encode()); return h.hexdigest()
+def state_lock(state, X, mask, cfg):
+    """Fingerprint inputs and settings for checkpoint compatibility, not payload integrity."""
+    digest = hashlib.sha256()
+    digest.update(state.identity_token.encode())
+    for array in [state.starts, state.lengths, state.totals, state.offsets, X, mask]:
+        digest.update(np.ascontiguousarray(array).tobytes())
+    settings = cfg.as_dict()
+    settings.pop('resume')
+    settings.pop('checkpoint')
+    settings.pop('engine')
+    digest.update(json.dumps(settings, sort_keys=True).encode())
+    return digest.hexdigest()
 
-def solve(state,X,cfg,fit_mask=None,checkpoint_path=None,storage=None,stop_after_cycles=None,exposure=None):
-    start=time.perf_counter(); cfg.validate(); state.validate()
-    X=np.asarray(X,dtype=np.float64)
-    if X.ndim!=2 or X.shape[0]!=state.n_days or not np.isfinite(X).all(): raise ValueError('Invalid design')
-    mask=np.ones(state.n_days,bool) if fit_mask is None else np.asarray(fit_mask,dtype=bool)
-    if mask.shape!=(state.n_days,): raise ValueError('Fit mask shape')
-    if cfg.mode=='paper_reference' and not mask.all(): raise ValueError('Reference fits all domain days')
-    X=X.copy(); X.setflags(write=False); mask=mask.copy(); mask.setflags(write=False)
-    lock=state_lock(state,X,mask,cfg); aggregate=aggregate_kernel.py_func if cfg.engine=='reference' else aggregate_kernel
-    a=initialize(state,cfg,storage); y,count=aggregate(a,state.starts,state.lengths,state.offsets,state.n_days)
-    iterations=[]; cycles=[]; noops=0; resume_data=None
+def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop_after_cycles=None, exposure=None):
+    """Fit fixed aggregate predictions and shift full bill intervals sequentially."""
+    started_at = time.perf_counter()
+    cfg.validate()
+    state.validate()
+    X = np.asarray(X, dtype=np.float64)
+    if X.ndim != 2 or X.shape[0] != state.n_days or (not np.isfinite(X).all()):
+        raise ValueError('Invalid design')
+    fit_rows = np.ones(state.n_days, bool) if fit_mask is None else np.asarray(fit_mask, dtype=bool)
+    if fit_rows.shape != (state.n_days,):
+        raise ValueError('Fit mask shape')
+    if cfg.mode == 'paper_reference' and (not fit_rows.all()):
+        raise ValueError('Reference fits all domain days')
+    X = X.copy()
+    X.setflags(write=False)
+    fit_rows = fit_rows.copy()
+    fit_rows.setflags(write=False)
+    input_lock = state_lock(state, X, fit_rows, cfg)
+    aggregate_function = aggregate_kernel.py_func if cfg.engine == 'reference' else aggregate_kernel
+    # Establish allocations before optionally restoring completed-cycle state.
+    allocations = initialize(state, cfg, storage)
+    (daily_total, daily_count) = aggregate_function(
+        allocations,
+        state.starts,
+        state.lengths,
+        state.offsets,
+        state.n_days,
+    )
+    iteration_diagnostics = []
+    cycle_diagnostics = []
+    total_noops = 0
+    resume_data = None
     if cfg.resume:
-        if not checkpoint_path or not Path(checkpoint_path).exists(): raise ValueError('No resume checkpoint')
-        loaded=np.load(checkpoint_path,allow_pickle=False)
-        resume_data={name:loaded[name].copy() for name in loaded.files}
+        if not checkpoint_path or not Path(checkpoint_path).exists():
+            raise ValueError('No resume checkpoint')
+        loaded = np.load(checkpoint_path, allow_pickle=False)
+        resume_data = {name: loaded[name].copy() for name in loaded.files}
         loaded.close()
-        if str(resume_data['lock'])!=lock: raise ValueError('Checkpoint input/design/config mismatch')
-        a[:]=resume_data['a']; y=resume_data['y'].copy(); iterations=json.loads(str(resume_data['iterations'])); cycles=json.loads(str(resume_data['cycles'])); noops=int(resume_data['noops'])
-    if np.all(state.totals==0):
-        return Result(a,y,np.zeros_like(y),[],[],0,True,time.perf_counter()-start)
-    executed=0; first_r=int(resume_data['outer']) if resume_data is not None else 0
-    for r in range(first_r,cfg.n_lr_models):
-        if resume_data is not None and r==first_r:
-            beta=resume_data['beta']; p=resume_data['prediction'].copy(); info=json.loads(str(resume_data['fit_info'])); first_j=int(resume_data['next_cycle']); old_y=resume_data['old_y']; old_a=resume_data['old_a']; outer_noops=int(resume_data['outer_noops'])
+        if str(resume_data['lock']) != input_lock:
+            raise ValueError('Checkpoint input/design/config mismatch')
+        allocations[:] = resume_data['a']
+        daily_total = resume_data['y'].copy()
+        iteration_diagnostics = json.loads(str(resume_data['iterations']))
+        cycle_diagnostics = json.loads(str(resume_data['cycles']))
+        total_noops = int(resume_data['noops'])
+    if np.all(state.totals == 0):
+        return Result(
+            allocations,
+            daily_total,
+            np.zeros_like(daily_total),
+            [],
+            [],
+            0,
+            True,
+            time.perf_counter() - started_at,
+        )
+    executed_cycles = 0
+    first_outer = int(resume_data['outer']) if resume_data is not None else 0
+    # Each outer fit supplies one prediction shared by all its shifting cycles.
+    for outer_index in range(first_outer, cfg.n_lr_models):
+        if resume_data is not None and outer_index == first_outer:
+            beta = resume_data['beta']
+            prediction = resume_data['prediction'].copy()
+            fit_info = json.loads(str(resume_data['fit_info']))
+            first_cycle = int(resume_data['next_cycle'])
+            outer_start_total = resume_data['old_y']
+            outer_start_allocations = resume_data['old_a']
+            outer_noops = int(resume_data['outer_noops'])
         else:
-            old_y=y.copy(); old_a=a.copy(); outer_noops=0; first_j=0
-            beta,p,info=lstsq_diagnostics(X,y,mask,cfg)
-        p.setflags(write=False); immutable_hash=hashlib.sha256(p.tobytes()).hexdigest()
-        for j in range(first_j,cfg.n_disagg_cycles):
-            if cfg.engine=='reference': n=reference_sweep(a,y,p,state,cfg)
-            else: n=scaled_sweep(a,y,p,state.starts,state.lengths,state.totals,state.offsets,cfg.alpha,cfg.reconciliation_atol,cfg.reconciliation_rtol)
-            noops+=n; outer_noops+=n
-            max_bill=conservation_kernel(a,state.totals,state.offsets,cfg.reconciliation_atol,cfg.reconciliation_rtol)
-            checked,count=aggregate(a,state.starts,state.lengths,state.offsets,state.n_days)
-            discrepancy=np.abs(checked-y); gamma=count*EPS/(1-count*EPS); bound=gamma*np.abs(checked)+count*cfg.reconciliation_atol
-            if np.any(discrepancy>bound): raise ArithmeticError('Aggregate drift exceeds summation bound')
-            if hashlib.sha256(p.tobytes()).hexdigest()!=immutable_hash: raise ArithmeticError('Prediction mutated')
-            y=checked
-            cycles.append({'outer':r,'cycle':j,'zero_residual_noops':int(n),'max_bill_abs_error':float(max_bill),'max_aggregate_discrepancy':float(discrepancy.max()),'max_aggregate_bound':float(bound.max())})
-            executed+=1
+            outer_start_total = daily_total.copy()
+            outer_start_allocations = allocations.copy()
+            outer_noops = 0
+            first_cycle = 0
+            beta, prediction, fit_info = lstsq_diagnostics(X, daily_total, fit_rows, cfg)
+        prediction.setflags(write=False)
+        prediction_hash = hashlib.sha256(prediction.tobytes()).hexdigest()
+        for cycle_index in range(first_cycle, cfg.n_disagg_cycles):
+            if cfg.engine == 'reference':
+                cycle_noops = reference_sweep(allocations, daily_total, prediction, state, cfg)
+            else:
+                cycle_noops = scaled_sweep(
+                    allocations,
+                    daily_total,
+                    prediction,
+                    state.starts,
+                    state.lengths,
+                    state.totals,
+                    state.offsets,
+                    cfg.alpha,
+                    cfg.reconciliation_atol,
+                    cfg.reconciliation_rtol,
+                )
+            total_noops += cycle_noops
+            outer_noops += cycle_noops
+            # Check conservation, then rebuild the aggregate in canonical order.
+            max_bill_error = conservation_kernel(
+                allocations,
+                state.totals,
+                state.offsets,
+                cfg.reconciliation_atol,
+                cfg.reconciliation_rtol,
+            )
+            (recomputed_total, daily_count) = aggregate_function(
+                allocations,
+                state.starts,
+                state.lengths,
+                state.offsets,
+                state.n_days,
+            )
+            aggregate_discrepancy = np.abs(recomputed_total - daily_total)
+            gamma = daily_count * EPS / (1 - daily_count * EPS)
+            drift_bound = gamma * np.abs(recomputed_total) + daily_count * cfg.reconciliation_atol
+            if np.any(aggregate_discrepancy > drift_bound):
+                raise ArithmeticError('Aggregate drift exceeds summation bound')
+            if hashlib.sha256(prediction.tobytes()).hexdigest() != prediction_hash:
+                raise ArithmeticError('Prediction mutated')
+            daily_total = recomputed_total
+            cycle_diagnostics.append(
+                {
+                    'outer': outer_index,
+                    'cycle': cycle_index,
+                    'zero_residual_noops': int(cycle_noops),
+                    'max_bill_abs_error': float(max_bill_error),
+                    'max_aggregate_discrepancy': float(aggregate_discrepancy.max()),
+                    'max_aggregate_bound': float(drift_bound.max()),
+                },
+            )
+            executed_cycles += 1
+            # Save only completed cycles, replacing the previous checkpoint atomically.
             if cfg.checkpoint and checkpoint_path:
-                tmp=Path(str(checkpoint_path)+'.tmp')
-                with tmp.open('wb') as f: np.savez(f,lock=lock,a=a,y=y,prediction=p,beta=beta,outer=r,next_cycle=j+1,old_y=old_y,old_a=old_a,outer_noops=outer_noops,noops=noops,iterations=json.dumps(iterations),cycles=json.dumps(cycles),fit_info=json.dumps(info),fit_mask=mask,design=X,g=np.ones(state.n_days) if exposure is None else exposure,source_order_identity=state.identity_token,config_json=json.dumps(cfg.as_dict()))
-                tmp.replace(checkpoint_path)
-            if stop_after_cycles and executed>=stop_after_cycles: return Result(a,y,p,iterations,cycles,noops,False,time.perf_counter()-start)
-        diff_y=y-old_y; diff_a=a-old_a
-        info.update({'outer':r,'max_y_change_fit':float(np.max(np.abs(diff_y[mask]))),'relative_y_change_fit':float(np.linalg.norm(diff_y[mask])/max(np.linalg.norm(old_y[mask]),EPS)),'max_allocation_change':float(np.max(np.abs(diff_a))),'relative_allocation_change':float(np.linalg.norm(diff_a)/max(np.linalg.norm(old_a),EPS)),'negative_predicted_days':int(np.sum(p<0)),'zero_residual_noops':outer_noops,'final_fit_residual_norm':float(np.linalg.norm(y[mask]-p[mask]))})
-        iterations.append(info)
-        resume_data=None
-    return Result(a,y,p,iterations,cycles,noops,False,time.perf_counter()-start)
+                temporary_checkpoint = Path(str(checkpoint_path) + '.tmp')
+                with temporary_checkpoint.open('wb') as checkpoint_file:
+                    np.savez(
+                        checkpoint_file,
+                        lock=input_lock,
+                        a=allocations,
+                        y=daily_total,
+                        prediction=prediction,
+                        beta=beta,
+                        outer=outer_index,
+                        next_cycle=cycle_index + 1,
+                        old_y=outer_start_total,
+                        old_a=outer_start_allocations,
+                        outer_noops=outer_noops,
+                        noops=total_noops,
+                        iterations=json.dumps(iteration_diagnostics),
+                        cycles=json.dumps(cycle_diagnostics),
+                        fit_info=json.dumps(fit_info),
+                        fit_mask=fit_rows,
+                        design=X,
+                        g=np.ones(state.n_days) if exposure is None else exposure,
+                        source_order_identity=state.identity_token,
+                        config_json=json.dumps(cfg.as_dict()),
+                    )
+                temporary_checkpoint.replace(checkpoint_path)
+            if stop_after_cycles and executed_cycles >= stop_after_cycles:
+                return Result(
+                    allocations,
+                    daily_total,
+                    prediction,
+                    iteration_diagnostics,
+                    cycle_diagnostics,
+                    total_noops,
+                    False,
+                    time.perf_counter() - started_at,
+                )
+        # Compare the completed outer iteration with its saved starting state.
+        aggregate_change = daily_total - outer_start_total
+        allocation_change = allocations - outer_start_allocations
+        fit_info.update(
+            {
+                'outer': outer_index,
+                'max_y_change_fit': float(np.max(np.abs(aggregate_change[fit_rows]))),
+                'relative_y_change_fit': float(
+                    np.linalg.norm(aggregate_change[fit_rows])
+                    / max(np.linalg.norm(outer_start_total[fit_rows]), EPS)
+                ),
+                'max_allocation_change': float(np.max(np.abs(allocation_change))),
+                'relative_allocation_change': float(
+                    np.linalg.norm(allocation_change)
+                    / max(np.linalg.norm(outer_start_allocations), EPS)
+                ),
+                'negative_predicted_days': int(np.sum(prediction < 0)),
+                'zero_residual_noops': outer_noops,
+                'final_fit_residual_norm': float(
+                    np.linalg.norm(daily_total[fit_rows] - prediction[fit_rows])
+                ),
+            },
+        )
+        iteration_diagnostics.append(fit_info)
+        resume_data = None
+    return Result(
+        allocations,
+        daily_total,
+        prediction,
+        iteration_diagnostics,
+        cycle_diagnostics,
+        total_noops,
+        False,
+        time.perf_counter() - started_at,
+    )

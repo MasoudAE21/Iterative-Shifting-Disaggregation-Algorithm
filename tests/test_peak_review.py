@@ -146,3 +146,70 @@ def test_default_cohort_known_truth_exposure(tmp_path,scenario,record_property):
     assert np.isfinite(mae) and np.isfinite(baseline)
     record_property('scenario',scenario);record_property('isd_customer_mae',mae);record_property('uniform_customer_mae',baseline)
 
+
+
+def test_individual_peaks_dates_ties_missing_partial_and_zero(tmp_path):
+    from isd.peak import write_peak_summary
+    classes = {'001': ('full', 2), '002': ('partial', 1), '003': ('none', 0), '004': ('full', 2)}
+    rows = []
+    for ident, values in zip(classes, [[4., 4.], [None, 9.], [None, None], [0., 0.]]):
+        for day, value in zip([date(2025, 1, 21), date(2025, 1, 20)], values):
+            rows.append({'SubscriptionNumber': ident, 'date_gregorian': day,
+                         'estimated_consumption': value,
+                         'reason': 'internal_target_gap' if ident == '003' else 'no_target_bill'})
+    pq.write_table(pa.Table.from_pylist(rows), tmp_path / 'target_customer_daily.parquet')
+    cfg = Config(peak_mode='individual', target_end_exclusive='2025-01-22')
+    (tmp_path / 'peak_daily_totals.csv').write_text('stale')
+    peak = export_peak(tmp_path, classes, cfg)
+    with (tmp_path / 'customer_peak_consumption.csv').open(newline='') as f:
+        assert list(csv.reader(f)) == [
+            ['SubscriptionNumber', 'peakCosumptionValue', 'peakDate'],
+            ['001', '4.0', '2025-01-20'], ['002', '9.0', '2025-01-20'],
+            ['003', '', ''], ['004', '0.0', '2025-01-20'],
+        ]
+    assert peak['valid_zeros'] == 1 and peak['missing_reasons'] == {'internal_target_gap': 1}
+    assert not (tmp_path / 'peak_daily_totals.csv').exists()
+    manifest = {'configuration': cfg.as_dict(), 'peak': peak, 'wall_seconds': 0,
+                'peak_rss_bytes': 0, 'inputs': {}, 'code': {}, 'dependencies': {}}
+    write_peak_summary(tmp_path, manifest)
+    assert 'peakDate' in (tmp_path / 'peak_summary.md').read_text()
+    # Individual mode does not require a complete-coverage population.
+    export_peak(tmp_path, {ident: ('none', 0) for ident in classes}, cfg)
+    rows.append(rows[0])
+    pq.write_table(pa.Table.from_pylist(rows), tmp_path / 'target_customer_daily.parquet')
+    with pytest.raises(ArithmeticError, match='Duplicate'):
+        export_peak(tmp_path, classes, cfg)
+
+
+@pytest.mark.parametrize('value', [float('nan'), float('inf'), -1.])
+def test_individual_peak_rejects_invalid_values(tmp_path, value):
+    rows = [{'SubscriptionNumber': '001', 'date_gregorian': date(2025, 1, 20),
+             'estimated_consumption': value, 'reason': 'none'}]
+    pq.write_table(pa.Table.from_pylist(rows), tmp_path / 'target_customer_daily.parquet')
+    with pytest.raises(ArithmeticError, match='Invalid individual'):
+        export_peak(tmp_path, {'001': ('full', 1)}, Config(peak_mode='individual', target_end_exclusive='2025-01-21'))
+
+
+def test_invalid_peak_mode():
+    with pytest.raises(ValueError, match='Unknown peak mode'):
+        Config(peak_mode='typo').validate()
+
+
+def test_individual_peaks_different_dates_and_precision(tmp_path):
+    rows = []
+    for ident, values in [('001', [2., np.nextafter(2., 3.)]), ('002', [9., 1.])]:
+        for day, value in zip([date(2025, 1, 20), date(2025, 1, 21)], values):
+            rows.append({'SubscriptionNumber': ident, 'date_gregorian': day,
+                         'estimated_consumption': value, 'reason': 'none'})
+    path = tmp_path / 'target_customer_daily.parquet'
+    pq.write_table(pa.Table.from_pylist(rows), path)
+    cfg = Config(peak_mode='individual', target_end_exclusive='2025-01-22')
+    classes = {'001': ('full', 2), '002': ('full', 2)}
+    export_peak(tmp_path, classes, cfg)
+    with (tmp_path / 'customer_peak_consumption.csv').open() as f:
+        data = list(csv.DictReader(f))
+    assert [row['peakDate'] for row in data] == ['2025-01-21', '2025-01-20']
+    assert float(data[0]['peakCosumptionValue']) == np.nextafter(2., 3.)
+    pq.write_table(pa.Table.from_pylist(rows[:-1]), path)
+    with pytest.raises(ArithmeticError, match='coverage mismatch'):
+        export_peak(tmp_path, classes, cfg)
