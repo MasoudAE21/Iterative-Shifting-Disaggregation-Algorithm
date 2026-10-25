@@ -7,7 +7,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from .data import EPOCH
-HEADERS=['time','temperature_2m (Ã‚Â°C)','apparent_temperature (Ã‚Â°C)','wind_speed_10m (km/h)']
+HEADERS = [
+    'time',
+    'temperature_2m (\u00b0C)',
+    'apparent_temperature (\u00b0C)',
+    'wind_speed_10m (km/h)',
+]
 
 def read_weather(path):
     lines = Path(path).read_text(encoding='utf-8').splitlines()

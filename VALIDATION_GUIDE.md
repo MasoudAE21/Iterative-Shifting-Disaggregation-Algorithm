@@ -14,10 +14,15 @@ Set-Location D:\work\repo
 Use `.venv\Scripts\python.exe` as your IDE interpreter too. The first solver test
 may take longer while Numba compiles kernels.
 
+The test commands below use a fresh temporary directory on each invocation,
+bypassing the inaccessible default `pytest-of-Masoud` directory. Run these
+commands in your own PowerShell session. Pytest may clear the directory supplied
+with `--basetemp`; the generated GUID ensures it is a new disposable location.
+
 ## 2. Check data preparation and weather
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests/test_data_weather.py -q -p no:cacheprovider
+.\.venv\Scripts\python.exe -m pytest tests/test_data_weather.py tests/test_weather_headers.py -q -p no:cacheprovider --basetemp "$env:TEMP\isd-tests-$([guid]::NewGuid().ToString('N'))"
 ```
 
 Expected: all tests pass. Covers normalization, internal-gap rejection, coverage,
@@ -26,7 +31,7 @@ prepared-state samples, weather integration and target-day plots.
 ## 3. Check solver math and engine agreement
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests/test_solver.py tests/test_real_fixture.py -q -p no:cacheprovider
+.\.venv\Scripts\python.exe -m pytest tests/test_solver.py tests/test_real_fixture.py -q -p no:cacheprovider --basetemp "$env:TEMP\isd-tests-$([guid]::NewGuid().ToString('N'))"
 ```
 
 Expected: all tests pass. Includes hand-calculated updates, conservation,
@@ -35,7 +40,7 @@ checkpoint behavior, and reference/scaled comparison on a pseudonymized fixture.
 ## 4. Check pipeline, both peak modes, and independent verification
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests/test_pipeline.py tests/test_peak_review.py tests/test_peak_verifier.py -q -p no:cacheprovider
+.\.venv\Scripts\python.exe -m pytest tests/test_pipeline.py tests/test_peak_review.py tests/test_peak_verifier.py -q -p no:cacheprovider --basetemp "$env:TEMP\isd-tests-$([guid]::NewGuid().ToString('N'))"
 ```
 
 Expected: all tests pass. These use temporary fixtures, not a full real-data run.
