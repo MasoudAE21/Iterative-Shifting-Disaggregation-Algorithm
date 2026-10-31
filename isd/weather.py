@@ -1,4 +1,4 @@
-"""Point-value adapter; transform weather only AFTER local daily integration."""
+"""Direct daily export adapter plus legacy hourly integration for reproducibility."""
 from .errors import AvailabilityError
 import csv, io
 from datetime import datetime,timedelta,timezone,date
@@ -22,14 +22,31 @@ def read_weather(path):
         next(csv.reader([lines[0]])),
         next(csv.reader([lines[1]])),
     ))
-    if metadata.get('timezone') != 'GMT' or metadata.get('utc_offset_seconds') != '0':
-        raise ValueError('UTC adapter requires GMT metadata')
-
     observations = pd.read_csv(
         io.StringIO('\n'.join(lines[3:])),
         dtype={'time': 'string'},
         keep_default_na=False,
     )
+    daily_headers = ['time', 'apparent_temperature_mean (°C)', 'wind_speed_10m_max (km/h)']
+    if list(observations.columns) == daily_headers:
+        if not observations.time.str.fullmatch(r'\d{4}-\d{2}-\d{2}').all():
+            raise ValueError('Daily weather requires ISO calendar dates')
+        dates = pd.to_datetime(observations.time, format='%Y-%m-%d', errors='raise')
+        if dates.duplicated().any() or not dates.is_monotonic_increasing:
+            raise ValueError('Duplicate or unordered daily weather dates')
+        values = observations[daily_headers[1:]].astype(float).to_numpy()
+        if not np.isfinite(values).all() or np.any(values[:, 1] < 0):
+            raise ValueError('Invalid daily weather values')
+        daily = pd.DataFrame({'date_gregorian': dates.dt.date,
+            'apparent_temperature_mean_C': values[:, 0], 'wind_max_kmh': values[:, 1]})
+        metadata.update({'provider_variable_definition': 'daily_mean_apparent_temperature_and_max_wind',
+            'adapter_version': 'daily_date_labels_v1', 'temperature_basis': 'apparent',
+            'wind_statistic': 'maximum', 'day_alignment': 'source calendar date labels; no timezone conversion'})
+        daily.attrs['weather_metadata'] = metadata
+        seconds = np.array([datetime.combine(d, datetime.min.time(), timezone.utc).timestamp() for d in daily.date_gregorian])
+        return seconds, daily, metadata
+    if metadata.get('timezone') != 'GMT' or metadata.get('utc_offset_seconds') != '0':
+        raise ValueError('UTC adapter requires GMT metadata')
     if list(observations.columns) != HEADERS:
         raise ValueError('Weather headers/units changed')
     if not observations.time.str.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}').all():
@@ -58,6 +75,23 @@ def read_weather(path):
     return seconds, values, metadata
 
 def daily_integral(seconds, values, days, tz_name='Asia/Tehran', *, plot_directory=None, target_start=None, target_end_exclusive=None):
+    if isinstance(values, pd.DataFrame):
+        dates = [EPOCH.date() + timedelta(days=int(d)) for d in days]
+        daily = values.set_index('date_gregorian').reindex(dates).rename_axis('date_gregorian').reset_index()
+        metadata = values.attrs['weather_metadata']
+        complete = daily[['apparent_temperature_mean_C', 'wind_max_kmh']].notna().all(axis=1)
+        daily['weather_status'] = np.where(complete, 'complete', 'unavailable')
+        daily['adapter_version'] = 'daily_date_labels_v1'
+        daily['source_timezone'] = metadata.get('timezone', 'unknown')
+        daily['day_alignment'] = metadata['day_alignment']
+        daily['weather_location_id'] = '_'.join(str(metadata.get(k,'')) for k in ['latitude','longitude','elevation'])
+        daily['apparent_temperature_mean_F'] = daily.apparent_temperature_mean_C * 1.8 + 32
+        daily['wind_max_mph'] = daily.wind_max_kmh / 1.609344
+        if plot_directory is not None:
+            if target_start is None or target_end_exclusive is None:
+                raise ValueError('Plotting requires explicit target bounds')
+            save_daily_weather_plots(daily, plot_directory, target_start, target_end_exclusive)
+        return daily
     seconds = np.asarray(seconds, float)
     values = np.asarray(values, float)
     local_timezone = ZoneInfo(tz_name)
@@ -128,6 +162,13 @@ def save_daily_weather_plots(daily, directory, target_start, target_end_exclusiv
         ('apparent_temperature_mean_C', 'Daily mean apparent temperature', 'Apparent temperature (°C)', '#c2410c'),
         ('wind_mean_kmh', 'Daily mean wind speed', 'Wind speed (km/h)', '#087f5b'),
     ]
+    if 'wind_max_kmh' in target:
+        for obsolete in ['temperature_mean_C.svg', 'wind_mean_kmh.svg']:
+            (directory / obsolete).unlink(missing_ok=True)
+        plots = [
+            ('apparent_temperature_mean_C', 'Daily mean apparent temperature', 'Apparent temperature (°C)', '#c2410c'),
+            ('wind_max_kmh', 'Daily maximum wind speed', 'Maximum wind speed (km/h)', '#087f5b'),
+        ]
     paths = []
     left, top, width, height = 100, 110, 930, 300
     for column, title, units, color in plots:
@@ -147,7 +188,7 @@ def save_daily_weather_plots(daily, directory, target_start, target_end_exclusiv
             '<rect width="1100" height="510" fill="white"/>',
             '<g font-family="Arial, sans-serif" fill="#1f2937">',
             f'<text x="100" y="35" font-size="23" font-weight="bold">{escape(title)}</text>',
-            f'<text x="100" y="62" font-size="15">{start:%Y-%m-%d} through {dates[-1]:%Y-%m-%d} (local calendar dates)</text>',
+            f'<text x="100" y="62" font-size="15">{start:%Y-%m-%d} through {dates[-1]:%Y-%m-%d} ({"source daily date labels" if "wind_max_kmh" in target else "local calendar dates"})</text>',
             f'<text x="100" y="91" font-size="14">{escape(units)}</text>',
         ]
         for tick in np.linspace(low, high, 6):
@@ -181,8 +222,10 @@ def save_daily_weather_plots(daily, directory, target_start, target_end_exclusiv
 
 def weather_features(daily):
     """Build weather features from daily mean temperature (°F) and wind (mph)."""
-    temperature_f = daily.temperature_mean_F.to_numpy()
-    wind_mph = daily.wind_mean_mph.to_numpy()
+    is_daily = 'apparent_temperature_mean_F' in daily and 'wind_max_mph' in daily
+    temperature_f = daily.apparent_temperature_mean_F.to_numpy() if is_daily else daily.temperature_mean_F.to_numpy()
+    # Daily maximum wind is not substituted for daily mean wind in HDDW65.
+    wind_mph = np.full(len(daily), np.nan) if is_daily else daily.wind_mean_mph.to_numpy()
     hdd65 = np.maximum(65 - temperature_f, 0)
     hdd55 = np.maximum(55 - temperature_f, 0)
     cdd65 = np.maximum(temperature_f - 65, 0)
@@ -205,13 +248,19 @@ def build_design(daily, preset, mask, mode, exposure, exposure_scaled=True, allo
         'winter_hdd65_v1': ['intercept', 'HDD65'],
         'winter_hdd65_hddw65_v1': ['intercept', 'HDD65', 'HDDW65'],
         'intercept_only_v1': ['intercept'],
+        'daily_apparent_hdd65_v1': ['intercept', 'HDD65'],
     }
     if preset not in presets:
         raise ValueError('Unregistered feature preset')
     columns = presets[preset]
+    if 'wind_max_kmh' in daily and preset not in ('daily_apparent_hdd65_v1', 'intercept_only_v1'):
+        raise ValueError('Daily apparent-temperature input requires an explicit apparent-temperature preset; maximum wind is not mean wind')
+    if preset == 'daily_apparent_hdd65_v1' and 'wind_max_kmh' not in daily:
+        raise ValueError('Daily apparent-temperature preset requires daily weather input')
     features = weather_features(daily)
     design = np.column_stack([features[c] for c in columns])
     metadata = {
+        'temperature_basis': 'daily_mean_apparent' if 'wind_max_kmh' in daily else 'daily_mean_air',
         'features': columns,
         'means': [0.0] * len(columns),
         'population_std': [1.0] * len(columns),

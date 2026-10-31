@@ -10,6 +10,8 @@ __pycache__/
 /.env
 /.env.*
 /.pytest_cache/
+/.pytest_tmp/
 *.nbc
 *.nbi
 *.memmap
+/references/

@@ -1,127 +1,55 @@
-# Manual validation guide
+# Manual tests, smoke run, and Town analysis
 
-Run these commands one at a time in PowerShell. Stop at the first failure and
-send the command and complete traceback. None of these commands has been run as
-part of preparing this guide.
+Run these commands from PowerShell in order. They are ready for your manual run; this cleanup did not rerun the tests or regenerate results. Stop at the first failure and preserve its traceback.
 
-## 1. Use the project environment
+## 1. Tests
 
 ```powershell
 Set-Location D:\work\repo
-.\.venv\Scripts\python.exe --version
+.\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
-Use `.venv\Scripts\python.exe` as your IDE interpreter too. The first solver test
-may take longer while Numba compiles kernels.
+The repository's `conftest.py` automatically selects a unique `.pytest_tmp/run-...` directory for each run, avoiding Windows permissions on `Temp/pytest-of-Masoud`. An explicit `--basetemp` still overrides this. Scratch directories are ignored by Git and can be deleted after tests finish.
 
-The test commands below use a fresh temporary directory on each invocation,
-bypassing the inaccessible default `pytest-of-Masoud` directory. Run these
-commands in your own PowerShell session. Pytest may clear the directory supplied
-with `--basetemp`; the generated GUID ensures it is a new disposable location.
+The last completed suite had 96 passing tests. It covers daily weather, legacy hourly adapters, bill windows, solver behavior, exports and verification. The hello-world placeholder was removed; the regression tests remain useful.
 
-## 2. Check data preparation and weather
+## 2. Small real-data smoke run
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests/test_data_weather.py tests/test_weather_headers.py -q -p no:cacheprovider --basetemp "$env:TEMP\isd-tests-$([guid]::NewGuid().ToString('N'))"
+.\.venv\Scripts\python.exe run_pipeline.py --config configs/smoke.json --output outputs/smoke
 ```
 
-Expected: all tests pass. Covers normalization, internal-gap rejection, coverage,
-prepared-state samples, weather integration and target-day plots.
+This uses 100 fully covered customers, two outer fits and two shifting cycles, without checkpoints. It inherits the current Town settings: January 2–February 28, 2025; direct daily apparent temperature; accepted GMT/local-date approximation; original bill totals with weather-bounded exclusion. No TBS scaling is performed. JSON overrides the current IDE CONFIG, not legacy library defaults.
 
-## 3. Check solver math and engine agreement
+Check that `outputs/smoke/run_manifest.json` has `model_diagnostics.fallback_reason` equal to null. A completed export alone does not prove the ISD model ran.
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests/test_solver.py tests/test_real_fixture.py -q -p no:cacheprovider --basetemp "$env:TEMP\isd-tests-$([guid]::NewGuid().ToString('N'))"
+.\.venv\Scripts\python.exe scripts/verify_peak_outputs.py --output outputs/smoke
 ```
 
-Expected: all tests pass. Includes hand-calculated updates, conservation,
-checkpoint behavior, and reference/scaled comparison on a pseudonymized fixture.
+The independent verifier checks exported accounting and peak results. Its report is saved in `handoff/peak_final_verification.json`. Inspect the two weather SVGs, peak summary and run summary in the smoke output. Verification establishes internal consistency, not agreement with measured TBS.
 
-## 4. Check pipeline, both peak modes, and independent verification
+## 3. Town input analysis
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests/test_pipeline.py tests/test_peak_review.py tests/test_peak_verifier.py -q -p no:cacheprovider --basetemp "$env:TEMP\isd-tests-$([guid]::NewGuid().ToString('N'))"
+.\.venv\Scripts\python.exe scripts/run_town_analysis.py
 ```
 
-Expected: all tests pass. These use temporary fixtures, not a full real-data run.
-Together, steps 2–4 cover the current test modules; no need to repeat the whole
-suite immediately afterward.
+This runs the audit, writes the report, and draws the full bill-interval coverage plot. It reads current prepared files and raw TBS for an extraction cross-check. It does not fit the algorithm or modify input data. Allow time for the coverage-window calculations.
 
-## 5. Run a small real-data smoke check
+Review these regenerated files in `outputs/town_analysis/`:
+
+- `Town_data_analysis_report.md`: current readiness findings.
+- `daily_coverage.csv` and `audit.json`: evidence and source fingerprints.
+- `selected_bill_daily_coverage.png`: selected bills inside and outside the target.
+- `selected_bill_daily_counts.csv`: daily counts behind that plot.
+
+The plot uses Pillow, available in the current environment. If rebuilding the environment, install the packages in `requirements.txt`.
+
+## Later: full algorithm run
 
 ```powershell
-.\.venv\Scripts\python.exe -c "from pathlib import Path; from isd.config import Config; from isd.pipeline import run; run(Path.cwd(), Config(max_customers=100, sample_scope='cohort', n_lr_models=2, n_disagg_cycles=2, checkpoint=False), output_dir=Path('outputs/smoke'))"
+.\.venv\Scripts\python.exe run_pipeline.py --config configs/peak.json --output data/algorithm_output
 ```
 
-This still reads/audits the input file, but models at most 100 full-coverage
-customers with fewer iterations. Expect a `Completed ...` message. Inspect
-`outputs/smoke/run_manifest.json` for `model_diagnostics.fallback_reason`: a
-completed export can contain uniform fallback, so completion alone does not
-prove ISD ran. Inspect the peak summary, CSVs and three weather SVGs. The
-standalone verifier targets `outputs/`, not this smoke subdirectory.
-
-## 6. Run all customers
-
-In `run_pipeline.py`, keep `max_customers=None` and choose:
-
-- `peak_mode='population'`: one shared population peak date; existing two-column CSV.
-- `peak_mode='individual'`: each customer's own maximum and Gregorian `peakDate`.
-
-Keep `resume=False` (the Config default) for this fresh run. Do not change
-`production` just to process all customers; it controls semantic confirmation,
-not dataset size. Keep the configured 10 outer fits and 10 cycles per fit.
-
-Run the file in the IDE, or:
-
-```powershell
-.\.venv\Scripts\python.exe run_pipeline.py
-```
-
-Do not pass `--config` unless intended: JSON replaces the IDE CONFIG, and missing
-fields use Config defaults, including a 1,000-customer limit.
-
-This selects all customers with usable identifiers and retains their histories.
-Only accepted bills are allocated. Full-coverage customers enter cohort ISD;
-other accepted bills receive uniform fallback. Quarantined internal-gap customers
-remain unavailable. Population peak mode requires at least one full-coverage
-customer; individual mode does not.
-
-Memory and disk needs depend on bill counts and interval lengths. Ingestion is
-chunked but combines normalized records in memory; file-backed allocations do
-not eliminate solver copies. Large daily exports and checkpoints need disk space.
-There is no reliable runtime estimate from the recent focused checks.
-
-## 7. Verify the completed full output before changing code
-
-```powershell
-.\.venv\Scripts\python.exe scripts/verify_peak_outputs.py
-```
-
-Expected: a JSON report with `"passed": true`, also saved to
-`handoff/peak_final_verification.json`. It checks the mode stored in the manifest.
-Use normal Python, without `-O`, because this script uses assertions. Keep source
-files/configuration unchanged between generation and verification: the verifier
-checks the source fingerprint.
-
-Eyeball `outputs/peak_summary.md`, `customer_peak_consumption.csv`,
-`peak_missing_reasons.csv`, and `weather_plots/`. In individual mode dates can
-differ; ties use the earliest day. Missing values/dates are blank; zeros are
-numeric. Review manifest audit and fallback counts as well.
-
-To try the other mode, first verify and preserve any results you want, change
-`peak_mode`, and repeat steps 6–7. The next run replaces outputs. Old checkpoints
-are not interchangeable across configuration changes.
-
-## Optional: synthetic experiment report
-
-```powershell
-.\.venv\Scripts\python.exe -c "from isd.experiments import synthetic_experiment; print(synthetic_experiment().to_string(index=False))"
-```
-
-Expected: 12 rows (four scenarios × three methods), not a pass/fail result.
-ISD is not required to outperform every baseline in every scenario.
-
-If anything fails, send: step/command, full traceback, peak mode and configuration,
-and whether this was a test, smoke run, full run or verifier. For a failed run,
-also report whether a new run_manifest.json was created. Preserve failed outputs
-until we diagnose the issue; do not send raw customer data unnecessarily.
+This is not needed for the smoke/input-analysis stage. The apparent-temperature HDD feature remains the current provisional baseline; selecting better temperature features is the next investigation. Do not interpret this setup as a decision that the current feature is best.

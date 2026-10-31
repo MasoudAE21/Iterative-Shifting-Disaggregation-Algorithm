@@ -1,0 +1,8 @@
+{
+  "max_customers": 100,
+  "sample_scope": "cohort",
+  "n_lr_models": 2,
+  "n_disagg_cycles": 2,
+  "checkpoint": false,
+  "resume": false
+}

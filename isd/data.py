@@ -27,6 +27,11 @@ def calendar_check(cfg):
     start=date_ordinal(cfg.target_start); end=date_ordinal(cfg.target_end_exclusive)
     if start>=end: raise ValueError('Empty target')
     candidate=cfg.target_jalali_year_candidate
+    if cfg.target_year_confirmed:
+        return {'candidate_year':candidate,'start_gregorian':cfg.target_start,
+                'last_gregorian':str(pd.Timestamp(end-1,unit='D').date()),'days':end-start,
+                'mapping_verified':True,'intended_year_confirmed':True,
+                'start_jalali':jalali_date(start),'last_jalali':jalali_date(end-1)}
     expected_start=jdatetime.date(candidate,11,1).togregorian().isoformat()
     expected_end=jdatetime.date(candidate,12,30).togregorian().isoformat()
     if cfg.target_start!=expected_start or jalali_date(end-1)!=f'{candidate:04d}-12-30': raise ValueError('Target differs from provisional Jalali year mapping')

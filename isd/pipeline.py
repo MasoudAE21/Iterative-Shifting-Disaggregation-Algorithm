@@ -11,6 +11,7 @@ import pyarrow.parquet as pq
 import psutil
 from .errors import AvailabilityError
 from .config import Config
+from .bill_window import resolve_window,apply_bill_window
 from .data import read_bills,sha256,date_ordinal,jalali_date,calendar_check,coverage_classes,hash_sample,prepare_state,EPOCH
 from .weather import read_weather,daily_integral,build_design,weather_features
 from .solver import initialize,solve,lstsq_diagnostics,aggregate_kernel,correct_roundoff
@@ -426,7 +427,8 @@ def export_outputs(selected, classes, daily, origin, cfg, out, run_id, modeled, 
     target_writer = RowWriter(out / 'target_customer_daily.parquet', schema_for('target'), cfg.row_group_size)
     target_sum = np.zeros(target_end_exclusive - target_start)
     target_numeric_rows = target_null_rows = 0
-    quarantined_customers = set(selected.loc[selected.record_status != 'accepted', 'SubscriptionNumber'])
+    quarantined_customers = set(selected.loc[selected.record_status.isin(['rejected_invalid', 'quarantined_customer']), 'SubscriptionNumber'])
+    window_customers = set(selected.loc[selected.record_status == 'excluded_window', 'SubscriptionNumber'])
     gap_customers = set(selected.loc[selected.exclusion_reason == 'internal_target_gap', 'SubscriptionNumber'])
     records = iter(accepted.itertuples(index=False))
     current = next(records, None)
@@ -439,6 +441,7 @@ def export_outputs(selected, classes, daily, origin, cfg, out, run_id, modeled, 
         reasons = [
             'internal_target_gap' if customer_id in gap_customers
             else 'rejected_conflict' if customer_id in quarantined_customers
+            else 'bill_window_exclusion' if customer_id in window_customers
             else 'no_target_bill'
         ] * (target_end_exclusive - target_start)
         recorded_zero = [False] * (target_end_exclusive - target_start)
@@ -546,6 +549,7 @@ def export_outputs(selected, classes, daily, origin, cfg, out, run_id, modeled, 
         'full_allocation_sum': float(combined_sum.sum()),
         'full_target_export_identities_passed': True,
         'baseline_definitions': {
+            'temperature_basis': 'daily_mean_apparent' if 'wind_max_kmh' in daily else 'daily_mean_air',
             'uniform': 'B/L on complete bill interval',
             'weather_weighted': 'B * (1+HDD65) / sum_interval(1+HDD65); fixed, no regression or shifting',
             'ols': 'last immutable aggregate prediction; diagnostic, not bill reconciled',
@@ -563,7 +567,7 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
     cfg.validate()
     calendar_mapping = calendar_check(cfg)
     run_id = uuid.uuid4().hex
-    out = Path(output_dir) if output_dir else root / 'outputs' / 'ide_pilot'
+    out = Path(output_dir) if output_dir else root / 'data' / 'algorithm_output'
     out.mkdir(parents=True, exist_ok=True)
     # Invalidate prior completion artifacts while retaining resume state.
     for name in (
@@ -576,8 +580,14 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
         'peak_daily_totals.csv',
     ):
         (out / name).unlink(missing_ok=True)
-    bills_path = Path(bills_path) if bills_path else root / 'data' / 'bill_1403.csv'
-    weather_path = Path(weather_path) if weather_path else next((root / 'data').glob('open-meteo*.csv'))
+    bills_path = Path(bills_path) if bills_path else root / 'data' / 'prepared' / 'bill_Customers_Town_Q.csv'
+    if weather_path is None:
+        weather_paths = sorted((root / 'data' / 'prepared').glob('open-meteo*.csv'))
+        if len(weather_paths) != 1:
+            raise ValueError('Expected exactly one prepared weather export; pass weather_path explicitly otherwise')
+        weather_path = weather_paths[0]
+    else:
+        weather_path = Path(weather_path)
     with PeakMemory() as memory:
         stage_seconds = {}
         stage_rss = {}
@@ -591,6 +601,19 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
         stage_seconds['import_audit_seconds'] = time.perf_counter() - stage_started_at
         stage_rss['after_import'] = memory.process.memory_info().rss
         stage_started_at = time.perf_counter()
+        seconds, values, weather_metadata = read_weather(weather_path)
+        is_daily_weather = isinstance(values, pd.DataFrame)
+        if is_daily_weather:
+            if cfg.weather_adapter != 'daily_date_labels_v1' or cfg.provider_variable_definition != 'daily_mean_apparent_temperature_and_max_wind':
+                raise ValueError('Daily weather requires daily_date_labels_v1 configuration')
+            if weather_metadata.get('timezone') != cfg.timezone and not cfg.allow_daily_timezone_mismatch:
+                raise ValueError('Daily weather timezone differs from TBS; use local daily export or explicitly allow date-label alignment')
+            weather_metadata['timezone_mismatch_accepted'] = weather_metadata.get('timezone') != cfg.timezone
+        window_audit = {'policy': 'keep'}
+        window = None
+        if cfg.bill_boundary_policy != 'keep':
+            window = resolve_window(seconds, values, cfg)
+            source, window_audit = apply_bill_window(source, cfg, *window)
         selected, classes, selection = population(source, cfg)
         stage_seconds['population_seconds'] = time.perf_counter() - stage_started_at
         accepted = selected[selected.record_status == 'accepted']
@@ -598,10 +621,11 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
         target_end_exclusive = date_ordinal(cfg.target_end_exclusive)
         origin = int(accepted.start_ordinal.min()) if len(accepted) else target_start
         domain_end = int(accepted.end_ordinal.max()) if len(accepted) else target_end_exclusive
+        if window is not None and not len(accepted):
+            origin, domain_end = window
         stage_started_at = time.perf_counter()
-        # Integrate weather across the domain and plot the requested target dates.
-        seconds, values, weather_metadata = read_weather(weather_path)
-        if cfg.provider_variable_definition != 'instant' or cfg.weather_adapter != 'point_linear_integral_v1':
+        # Direct daily alignment for daily exports; integration only for legacy hourly inputs.
+        if not is_daily_weather and (cfg.provider_variable_definition != 'instant' or cfg.weather_adapter != 'point_linear_integral_v1'):
             raise ValueError('Unimplemented weather adapter; period orientation required')
         daily = daily_integral(
             seconds,
@@ -662,9 +686,9 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
         # Record input hashes, source versions, configuration, and diagnostics.
         input_files = (
             [bills_path, weather_path]
-            + list((root / 'data').glob('ISD_Independent_Review.docx'))
-            + list((root / 'data').glob('ISD_Implementation_Handoff.docx'))
-            + list((root / 'data').glob('An Iterative*.pdf'))
+            + list((root / 'references').glob('ISD_Independent_Review.docx'))
+            + list((root / 'references').glob('ISD_Implementation_Handoff.docx'))
+            + list((root / 'references').glob('An Iterative*.pdf'))
         )
         input_hashes = {p.name: sha256(p) for p in input_files}
         if len(source) and input_hashes[bills_path.name] != str(source.source_file_sha256.iloc[0]):
@@ -700,6 +724,7 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
             'python': platform.python_version(),
             'calendar_mapping': calendar_mapping,
             'source_audit': audit,
+            'bill_window': window_audit,
             'selection': selection,
             'date_domain_half_open': [
                 str(EPOCH.date() + timedelta(days=origin)),

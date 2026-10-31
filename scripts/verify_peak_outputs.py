@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from isd.data import sha256
 from isd.pipeline import source_fingerprint
 ROOT = Path(__file__).resolve().parents[1]
-out = ROOT / 'outputs'
+out = ROOT / 'data' / 'algorithm_output'
 
 def records(path, columns):
     for batch in pq.ParquetFile(path).iter_batches(batch_size=65536, columns=columns):
@@ -182,4 +182,8 @@ def verify_individual(output_dir, customer_ids, cfg, peak_metadata):
 
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path, default=out)
+    out = parser.parse_args().output
     main()

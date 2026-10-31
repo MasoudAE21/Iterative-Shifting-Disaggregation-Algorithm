@@ -31,6 +31,7 @@ class Config:
     consumption_unit: str = 'source_units_unknown'
     provider_variable_definition: str = 'instant'
     weather_adapter: str = 'point_linear_integral_v1'
+    allow_daily_timezone_mismatch: bool = False
     ordering_version: str = 'customer_start_end_bill_id_v1'
     coverage_policy: str = 'balanced_cohort_uniform_elsewhere_v1'
     zero_residual_policy: str = 'keep_current'
@@ -50,8 +51,17 @@ class Config:
     memmap_threshold_mb: int = 256
     checkpoint: bool = True
     resume: bool = False
+    # Legacy library default; the IDE entry point opts into weather-bounded exclusion.
+    bill_boundary_policy: str = 'keep'
+    bill_window: str = 'weather'
 
     def validate(self):
+        if self.bill_boundary_policy not in ('keep', 'exclude', 'prorate'):
+            raise ValueError('Unknown bill boundary policy')
+        if self.bill_window not in ('target', 'weather'):
+            raise ValueError('Unknown bill window')
+        if self.production and self.bill_boundary_policy == 'prorate':
+            raise ValueError('Prorated bill totals are provisional estimates')
         if self.peak_mode not in ('population', 'individual'):
             raise ValueError('Unknown peak mode')
         if self.feature_preset not in (
@@ -59,6 +69,7 @@ class Config:
             'winter_hdd65_v1',
             'winter_hdd65_hddw65_v1',
             'intercept_only_v1',
+            'daily_apparent_hdd65_v1',
         ):
             raise ValueError('Unregistered feature preset')
         for value in (self.reconciliation_atol, self.reconciliation_rtol):

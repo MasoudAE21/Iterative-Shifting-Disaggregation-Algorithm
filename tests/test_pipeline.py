@@ -9,9 +9,9 @@ from isd.data import COLUMNS
 from isd.pipeline import run
 
 def test_pipeline_full_intervals_missing_zeros_and_chunked_exports(tmp_path):
-    data=tmp_path/'data'; data.mkdir()
+    data=tmp_path/'data'/'prepared'; data.mkdir(parents=True)
     rows=[['00000000001','2025-01-02','2025-02-11','102','40','1','6'],['00000000001','2025-02-12','2025-04-04','260','40','1','6'],['00000000002','2025-02-01','2025-02-10','0','40','1','6'],['00000000003','2025-04-01','2025-04-02','4','40','1','6']]
-    pd.DataFrame(rows,columns=COLUMNS).to_csv(data/'bill_1403.csv',encoding='utf-8-sig',index=False)
+    pd.DataFrame(rows,columns=COLUMNS).to_csv(data/'bill_Customers_Town_Q.csv',encoding='utf-8-sig',index=False)
     with (data/'open-meteo-fixture.csv').open('w',encoding='utf-8') as f:
         f.write('latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n34.411247,50.490566,1435,0,GMT,GMT\n\ntime,temperature_2m (°C),apparent_temperature (°C),wind_speed_10m (km/h)\n')
         for i in range(2880):
