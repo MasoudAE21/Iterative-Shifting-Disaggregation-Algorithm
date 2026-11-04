@@ -31,7 +31,7 @@ def evaluate(run):
     full.date_gregorian = pd.to_datetime(full.date_gregorian)
     assert np.isfinite(full.estimated_consumption).all() and (full.estimated_consumption >= 0).all()
     sums = full.groupby('bill_id').estimated_consumption.sum()
-    ledger = reconciliation.set_index('bill_id')
+    ledger = reconciliation.set_index('bill_id').sort_index()
     assert set(sums.index) == set(ledger.index)
     errors = (sums-ledger.bill_total).abs()
     cfg = manifest['configuration']
