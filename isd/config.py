@@ -54,17 +54,32 @@ class Config:
     # Legacy library default; the IDE entry point opts into weather-bounded exclusion.
     bill_boundary_policy: str = 'keep'
     bill_window: str = 'weather'
+    simulation_start: str = '2024-11-01'
+    simulation_end_exclusive: str = '2025-04-01'
+    max_bill_days: int | None = None
+    bill_duration_scope: str = 'all'
+    bill_date_format: str = '%Y-%m-%d'
+    tbs_path: str | None = None
 
     def validate(self):
-        if self.bill_boundary_policy not in ('keep', 'exclude', 'prorate'):
+        if self.bill_duration_scope not in ('all', 'boundary'):
+            raise ValueError('Unknown bill duration scope')
+        if self.bill_date_format not in ('%Y-%m-%d', '%m/%d/%Y'):
+            raise ValueError('Unsupported bill date format')
+        if self.bill_boundary_policy not in ('keep', 'exclude', 'prorate', 'clip_preserve_total', 'monthly_weighted'):
             raise ValueError('Unknown bill boundary policy')
-        if self.bill_window not in ('target', 'weather'):
+        if self.bill_window not in ('target', 'weather', 'simulation'):
             raise ValueError('Unknown bill window')
-        if self.production and self.bill_boundary_policy == 'prorate':
+        if self.bill_boundary_policy == 'monthly_weighted' and self.bill_window != 'target':
+            raise ValueError('monthly_weighted requires bill_window=target')
+        if self.production and self.bill_boundary_policy in ('prorate', 'monthly_weighted'):
             raise ValueError('Prorated bill totals are provisional estimates')
+        if self.max_bill_days is not None and (isinstance(self.max_bill_days, bool) or not isinstance(self.max_bill_days, int) or self.max_bill_days < 1):
+            raise ValueError('max_bill_days must be a positive integer')
         if self.peak_mode not in ('population', 'individual'):
             raise ValueError('Unknown peak mode')
         if self.feature_preset not in (
+            'town_custom_v1',
             'paper_section3_v1',
             'winter_hdd65_v1',
             'winter_hdd65_hddw65_v1',

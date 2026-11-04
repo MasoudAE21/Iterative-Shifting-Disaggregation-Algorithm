@@ -13,7 +13,7 @@ from .errors import AvailabilityError
 from .config import Config
 from .bill_window import resolve_window,apply_bill_window
 from .data import read_bills,sha256,date_ordinal,jalali_date,calendar_check,coverage_classes,hash_sample,prepare_state,EPOCH
-from .weather import read_weather,daily_integral,build_design,weather_features
+from .weather import read_weather,daily_integral,build_design,weather_features,export_weather_features
 from .solver import initialize,solve,lstsq_diagnostics,aggregate_kernel,correct_roundoff
 
 class PeakMemory:
@@ -271,6 +271,7 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
                 else 'fit_unavailable'
             )
             diagnostics['fallback_detail'] = str(e)
+            print(f'Weather model fell back to uniform allocation: {e}', flush=True)
         diagnostics['allocated_model_interval_days'] = int(state.offsets[-1])
     else:
         diagnostics['fallback_reason'] = 'fit_unavailable'
@@ -567,7 +568,7 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
     cfg.validate()
     calendar_mapping = calendar_check(cfg)
     run_id = uuid.uuid4().hex
-    out = Path(output_dir) if output_dir else root / 'data' / 'algorithm_output'
+    out = Path(output_dir) if output_dir else root / 'outputs' / 'town'
     out.mkdir(parents=True, exist_ok=True)
     # Invalidate prior completion artifacts while retaining resume state.
     for name in (
@@ -581,6 +582,8 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
     ):
         (out / name).unlink(missing_ok=True)
     bills_path = Path(bills_path) if bills_path else root / 'data' / 'prepared' / 'bill_Customers_Town_Q.csv'
+    if weather_path is None and (root / 'data/prepared/open-meteo-2024-25.csv').is_file():
+        weather_path = root / 'data/prepared/open-meteo-2024-25.csv'
     if weather_path is None:
         weather_paths = sorted((root / 'data' / 'prepared').glob('open-meteo*.csv'))
         if len(weather_paths) != 1:
@@ -621,7 +624,7 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
         target_end_exclusive = date_ordinal(cfg.target_end_exclusive)
         origin = int(accepted.start_ordinal.min()) if len(accepted) else target_start
         domain_end = int(accepted.end_ordinal.max()) if len(accepted) else target_end_exclusive
-        if window is not None and not len(accepted):
+        if window is not None and (not len(accepted) or cfg.bill_window == 'simulation' or cfg.bill_boundary_policy in ('clip_preserve_total', 'monthly_weighted')):
             origin, domain_end = window
         stage_started_at = time.perf_counter()
         # Direct daily alignment for daily exports; integration only for legacy hourly inputs.
@@ -637,6 +640,7 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
             target_end_exclusive=cfg.target_end_exclusive,
         )
         daily.to_parquet(out / 'daily_weather.parquet', index=False)
+        export_weather_features(daily, cfg.feature_preset, out / 'weather_features.csv')
         stage_seconds['weather_seconds'] = time.perf_counter() - stage_started_at
         normalized_bills = selected.copy()
         for field, ordinal_column in [('start_day', 'start_ordinal'), ('end_day_exclusive', 'end_ordinal')]:
@@ -762,6 +766,11 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
     # Final summaries are written after the measured context exits.
     manifest['wall_seconds'] = memory.seconds
     manifest['peak_rss_bytes'] = memory.peak
+    if cfg.tbs_path:
+        from .tbs import compare_tbs
+        roster_path = root / 'data/prepared/Customers_Town_Q.csv'
+        manifest['tbs_comparison'] = compare_tbs(root / cfg.tbs_path, out, cfg,
+                                               roster_path=roster_path if roster_path.is_file() else None)
     write_json(out / 'run_manifest.json', manifest)
     from .peak import write_peak_summary
     write_peak_summary(out, manifest)

@@ -1,0 +1,17 @@
+{
+  "simulation_start": "2023-12-01",
+  "simulation_end_exclusive": "2025-05-01",
+  "target_start": "2023-12-01",
+  "target_end_exclusive": "2025-05-01",
+  "bill_window": "target",
+  "bill_boundary_policy": "monthly_weighted",
+  "max_bill_days": 150,
+  "bill_duration_scope": "boundary",
+  "bill_date_format": "%m/%d/%Y",
+  "max_customers": null,
+  "feature_preset": "town_custom_v1",
+  "alpha": 0.05,
+  "n_lr_models": 50,
+  "n_disagg_cycles": 25,
+  "tbs_path": "data/prepared/TBS_Town_Q_daily_consumption.csv"
+}

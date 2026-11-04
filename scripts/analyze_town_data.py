@@ -16,11 +16,9 @@ lookup = {v:i for i,v in enumerate(ids)}
 import sys
 sys.path.insert(0,str(ROOT))
 from isd.weather import read_weather, daily_integral
-weather_paths=sorted(D.glob('open-meteo*.csv'))
-if len(weather_paths)!=1: raise ValueError('Expected exactly one prepared weather export')
-weather_path=weather_paths[0]
+weather_path=D/'open-meteo-2024-25.csv'
 x, weather_values, weather_metadata=read_weather(weather_path)
-weather=pd.read_csv(weather_path,skiprows=3)
+weather=pd.read_csv(weather_path,skiprows=3,encoding=weather_metadata['source_encoding']).dropna(axis=1,how='all')
 wt=pd.to_datetime(weather.time)
 tbs = read('TBS_Town_Q_daily_consumption.csv')
 tbs.index = pd.to_datetime(tbs.date_gregorian)

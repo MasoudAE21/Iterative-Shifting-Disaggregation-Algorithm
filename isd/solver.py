@@ -273,7 +273,12 @@ def lstsq_diagnostics(X, y, mask, cfg):
         or n_fit < max(30, 5 * n_features)
         or condition_number > 1e8
     ):
-        raise AvailabilityError('fit_unavailable: rank/count/condition gate')
+        raise AvailabilityError(
+            f'fit_unavailable: rank/count/condition gate: rank={rank}/{n_features}, '
+            f'fit_days={n_fit}, condition={condition_number:.3g}. '
+            'Use independent features; HDD thresholds above all fit temperatures '
+            'are redundant with each other and an intercept.'
+        )
     return (beta, predicted, diagnostics)
 
 def state_lock(state, X, mask, cfg):

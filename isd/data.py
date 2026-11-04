@@ -37,7 +37,7 @@ def calendar_check(cfg):
     if cfg.target_start!=expected_start or jalali_date(end-1)!=f'{candidate:04d}-12-30': raise ValueError('Target differs from provisional Jalali year mapping')
     return {'candidate_year':candidate,'start_gregorian':expected_start,'last_gregorian':expected_end,'days':end-start,'mapping_verified':True,'intended_year_confirmed':cfg.target_year_confirmed}
 
-def normalize_frame(raw,source_hash='synthetic',source_file='fixture.csv',allow_sample=False,row_start=2):
+def normalize_frame(raw,source_hash='synthetic',source_file='fixture.csv',allow_sample=False,row_start=2, date_format='%Y-%m-%d'):
     if list(raw.columns) != COLUMNS:
         raise ValueError('Exact seven columns required')
     raw = raw.astype('string[pyarrow]').copy()
@@ -68,8 +68,10 @@ def normalize_frame(raw,source_hash='synthetic',source_file='fixture.csv',allow_
     for column in COLUMNS:
         invalid |= raw[column].isna() | (raw[column].str.strip() == '')
     for column in ['FromDate', 'ToDate']:
-        valid_date_format = raw[column].str.fullmatch(r'\d{4}-\d{2}-\d{2}').fillna(False)
-        parsed_dates = pd.to_datetime(raw[column], format='%Y-%m-%d', errors='coerce', exact=True)
+        patterns = {'%Y-%m-%d': r'\d{4}-\d{2}-\d{2}', '%m/%d/%Y': r'\d{1,2}/\d{1,2}/\d{4}'}
+        valid_date_format = raw[column].str.fullmatch(patterns[date_format]).fillna(False)
+        parsed_dates = pd.to_datetime(raw[column], format=date_format, errors='coerce', exact=True)
+        normalized[column] = parsed_dates.dt.strftime('%Y-%m-%d').astype('string[pyarrow]')
         invalid |= ~valid_date_format | parsed_dates.isna()
         normalized['start_ordinal' if column == 'FromDate' else 'inclusive_end_ordinal'] = (
             (parsed_dates - EPOCH).dt.days
@@ -188,7 +190,8 @@ def read_bills(path, cfg, allow_sample=False):
     source_hash = sha256(path)
     # Require one record per physical line so source-row identities stay accurate.
     with path.open(encoding='utf-8-sig', newline='') as f:
-        if next(csv.reader(f)) != COLUMNS:
+        headers = next(csv.reader(f))
+        if len(headers) != len(COLUMNS) or set(headers) != set(COLUMNS):
             raise ValueError('Unexpected bill header')
         for line_number, line in enumerate(f, 2):
             if not line.strip():
@@ -211,7 +214,8 @@ def read_bills(path, cfg, allow_sample=False):
         on_bad_lines='error',
     ):
         normalized_chunk = normalize_frame(
-            raw_chunk, source_hash, path.name, allow_sample, next_source_row
+            raw_chunk[COLUMNS], source_hash, path.name, allow_sample, next_source_row,
+            date_format=cfg.bill_date_format,
         )
         next_source_row += len(normalized_chunk)
         normalized_chunks.append(normalized_chunk)

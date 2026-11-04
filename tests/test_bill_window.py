@@ -49,7 +49,7 @@ def test_weather_window_uses_complete_local_days_and_rejects_gaps():
         resolve_window(np.delete(seconds, 50), np.delete(values, 50, axis=0), cfg)
 
 
-@pytest.mark.parametrize('policy', ['exclude', 'prorate'])
+@pytest.mark.parametrize('policy', ['exclude', 'prorate', 'clip_preserve_total'])
 def test_pipeline_does_not_expand_to_long_bill(tmp_path, policy):
     data = tmp_path / 'data' / 'prepared'
     data.mkdir(parents=True)
@@ -73,7 +73,10 @@ def test_pipeline_does_not_expand_to_long_bill(tmp_path, policy):
     normalized = pd.read_parquet(out / 'normalized_bills.parquet')
     first = normalized[normalized.SubscriptionNumber == '00000000001'].iloc[0]
     assert first.raw_Consumption == '10000'
-    assert first.window_action == ('excluded' if policy == 'exclude' else 'prorated')
+    assert first.window_action == {'exclude': 'excluded', 'prorate': 'prorated', 'clip_preserve_total': 'clipped_preserved_total'}[policy]
+    if policy == 'clip_preserve_total':
+        total = reconciliation.loc[reconciliation.SubscriptionNumber == '00000000001', 'bill_total'].iloc[0]
+        assert total == 10000
     if policy == 'prorate':
         total = reconciliation.loc[reconciliation.SubscriptionNumber == '00000000001', 'bill_total'].iloc[0]
         assert total == pytest.approx(10000 * 60 / first.original_day_count)
@@ -91,3 +94,95 @@ def test_invalid_configuration():
         replace(Config(), bill_boundary_policy='invalid').validate()
     with pytest.raises(ValueError, match='bill window'):
         replace(Config(), bill_window='invalid').validate()
+
+
+def test_duration_limit_before_proration():
+    raw = pd.DataFrame([
+        ['00000000001', '2024-12-01', '2025-03-10', '1000', '40', '1', '6'],
+        ['00000000002', '2024-11-30', '2025-03-10', '1010', '40', '1', '6'],
+    ], columns=COLUMNS)
+    source, _ = audit_normalized(normalize_frame(raw))
+    result, audit = apply_bill_window(source, Config(bill_boundary_policy='prorate', max_bill_days=100),
+                                     date_ordinal('2025-03-01'), date_ordinal('2025-03-11'))
+    assert result.loc[0, 'Consumption'] == 100
+    assert result.loc[1, 'window_action'] == 'excluded_duration'
+    assert audit['excluded_duration_bills'] == 1
+    assert audit['removed_consumption'] == 1910
+
+
+def test_clip_preserves_full_total():
+    raw = pd.DataFrame([
+        ['00000000001', '2024-12-01', '2025-03-10', '1000', '40', '1', '6'],
+        ['00000000002', '2025-03-01', '2025-03-10', '50', '40', '1', '6'],
+        ['00000000003', '2024-11-30', '2025-03-10', '1010', '40', '1', '6'],
+    ], columns=COLUMNS)
+    source, _ = audit_normalized(normalize_frame(raw))
+    result, audit = apply_bill_window(source, Config(bill_boundary_policy='clip_preserve_total', max_bill_days=100),
+                                     date_ordinal('2025-01-02'), date_ordinal('2025-03-01'))
+    assert result.loc[0, 'Consumption'] == 1000
+    assert result.loc[0, 'day_count'] == 58
+    assert result.loc[0, 'retained_fraction'] == 1
+    assert result.loc[0, 'raw_FromDate'] == '2024-12-01'
+    assert result.loc[1, 'window_action'] == 'excluded'
+    assert result.loc[2, 'window_action'] == 'excluded_duration'
+    assert audit['retained_consumption'] == 1000
+    assert audit['clipped_preserved_total_bills'] == 1
+
+
+@pytest.mark.parametrize('bill_start,bill_end,total,expected', [
+    ('2024-11-01', '2025-02-28', 1000, 1000 * 58 / (30*.55+31*.8+31+28)),
+    ('2025-02-01', '2025-03-31', 1000, 1000 * 28 / (28+31*.57)),
+    ('2025-01-02', '2025-02-28', 1000, 1000),
+    ('2025-01-01', '2025-01-02', 100, 50),
+    ('2024-10-01', '2025-01-02', 1000, 1000 / (31*.2+30*.55+31*.8+2)),
+])
+def test_monthly_weighted(bill_start, bill_end, total, expected):
+    raw = pd.DataFrame([['00000000001', bill_start, bill_end, str(total), '40', '1', '6']], columns=COLUMNS)
+    source, _ = audit_normalized(normalize_frame(raw))
+    result, _ = apply_bill_window(source, Config(bill_boundary_policy='monthly_weighted', bill_window='target'),
+                                 date_ordinal('2025-01-02'), date_ordinal('2025-03-01'))
+    assert result.loc[0, 'Consumption'] == pytest.approx(expected)
+    assert result.loc[0, 'original_consumption'] == total
+    assert result.loc[0, 'retained_fraction'] == pytest.approx(expected / total)
+
+def test_other_month_weight():
+    from isd.bill_window import bill_weight_sum
+    assert bill_weight_sum(date_ordinal('2024-04-01'), date_ordinal('2024-05-01')) == pytest.approx(3)
+
+
+def test_boundary_only_duration_and_weighted_summer_conservation():
+    raw = pd.DataFrame([
+        ['00000000001','2024-01-01','2024-12-31','366','40','1','6'],
+        ['00000000002','2023-12-01','2024-05-31','183','40','1','6'],
+        ['00000000003','2024-12-01','2025-04-29','150','40','1','6'],
+        ['00000000004','2024-12-01','2025-04-30','151','40','1','6'],
+        ['00000000005','2025-01-01','2025-01-02','2','40','1','6'],
+    ], columns=COLUMNS)
+    source = normalize_frame(raw)
+    cfg = Config(bill_boundary_policy='monthly_weighted', bill_window='target',
+                 max_bill_days=150, bill_duration_scope='boundary')
+    result, ledger = apply_bill_window(source, cfg, date_ordinal('2024-01-01'), date_ordinal('2025-01-01'))
+    assert result.window_action.tolist() == ['unchanged','excluded_duration','monthly_weighted','excluded_duration','excluded']
+    assert result.loc[0,'Consumption'] == 366
+    assert result.loc[2,'Consumption'] == pytest.approx(150*(31*.8)/(31*.8+31+28+31*.57+29*.1))
+    assert ledger['excluded_duration_bills'] == 2
+    # Complementary summer windows must sum to the original observed bill.
+    summer = normalize_frame(pd.DataFrame([['00000000001','2024-03-01','2024-04-30','610','40','1','6']], columns=COLUMNS))
+    march, _ = apply_bill_window(summer, cfg, date_ordinal('2024-03-01'),date_ordinal('2024-04-01'))
+    april, _ = apply_bill_window(summer, cfg, date_ordinal('2024-04-01'),date_ordinal('2024-05-01'))
+    assert march.Consumption.iloc[0] + april.Consumption.iloc[0] == pytest.approx(610)
+    assert april.Consumption.iloc[0] == pytest.approx(610*3/(31*.57+3))
+
+
+def test_reordered_us_bill_export_preserves_raw_provenance(tmp_path):
+    from isd.data import read_bills
+    path = tmp_path / 'bills.csv'
+    path.write_text('SubscriptionNumber,FromDate,ToDate,Consumption,Capacity,ConsumptionType,UnitCount\n'
+                    '00000000001,12/1/2023,1/15/2024,460,6,40,1\n')
+    result, audit = read_bills(path, Config(bill_date_format='%m/%d/%Y'))
+    assert audit['record_status_counts'] == {'accepted': 1}
+    assert result.FromDate.iloc[0] == '2023-12-01'
+    assert result.raw_FromDate.iloc[0] == '12/1/2023'
+    assert result.day_count.iloc[0] == 46
+    assert result.Capacity.iloc[0] == 6
+    assert result.UnitCount.iloc[0] == 1

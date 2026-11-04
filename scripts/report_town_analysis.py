@@ -21,7 +21,7 @@ The current file contains **{w['rows']} daily rows**, from **{w['start_date']} t
 
 - Daily mean apparent temperature, in Celsius, is used directly.
 - Daily maximum wind speed, in km/h, is retained and plotted as maximum wind.
-- There is no air-temperature column and no mean-wind column. Neither is fabricated.
+- The source also supplies daily mean air temperature, retained separately by the weather reader. There is no mean-wind column.
 - The explicit `daily_apparent_hdd65_v1` model uses apparent-temperature heating degree days. It is a changed feature definition, not equivalent to the earlier air-temperature model. Maximum wind is not fed into a formula defined for mean wind.
 - Metadata location: {m['latitude']}, {m['longitude']}, elevation {m['elevation']} m. The elevation differs from the previous 1435 m export; comparisons with old runs therefore also reflect a changed source.
 

@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from isd.data import sha256
 from isd.pipeline import source_fingerprint
 ROOT = Path(__file__).resolve().parents[1]
-out = ROOT / 'data' / 'algorithm_output'
+out = ROOT / 'outputs' / 'town'
 
 def records(path, columns):
     for batch in pq.ParquetFile(path).iter_batches(batch_size=65536, columns=columns):

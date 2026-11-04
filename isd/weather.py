@@ -15,23 +15,40 @@ HEADERS = [
 ]
 
 def read_weather(path):
-    lines = Path(path).read_text(encoding='utf-8').splitlines()
-    if len(lines) < 5 or lines[2] != '':
+    raw = Path(path).read_bytes()
+    encoding = 'utf-8-sig'
+    try:
+        text = raw.decode(encoding)
+    except UnicodeDecodeError:
+        # Windows CSV exports commonly encode the degree symbol as byte B0.
+        encoding = 'cp1252'
+        text = raw.decode(encoding)
+    lines = text.splitlines()
+    if len(lines) < 5 or any(next(csv.reader([lines[2]]))):
         raise ValueError('Weather metadata shape')
     metadata = dict(zip(
         next(csv.reader([lines[0]])),
         next(csv.reader([lines[1]])),
     ))
+    metadata['source_encoding'] = encoding
     observations = pd.read_csv(
         io.StringIO('\n'.join(lines[3:])),
         dtype={'time': 'string'},
         keep_default_na=False,
     )
+    # Spreadsheet exports pad rows to the metadata table width.
+    padding = [c for c in observations if c.startswith('Unnamed: ') and (observations[c] == '').all()]
+    observations = observations.drop(columns=padding)
     daily_headers = ['time', 'apparent_temperature_mean (°C)', 'wind_speed_10m_max (km/h)']
-    if list(observations.columns) == daily_headers:
-        if not observations.time.str.fullmatch(r'\d{4}-\d{2}-\d{2}').all():
-            raise ValueError('Daily weather requires ISO calendar dates')
-        dates = pd.to_datetime(observations.time, format='%Y-%m-%d', errors='raise')
+    air_header = 'temperature_2m_mean (°C)'
+    if list(observations.columns) in (daily_headers, ['time', air_header] + daily_headers[1:]):
+        date_format = '%Y-%m-%d'
+        if observations.time.str.fullmatch(r'\d{1,2}/\d{1,2}/\d{4}').all():
+            date_format = '%m/%d/%Y'
+        elif not observations.time.str.fullmatch(r'\d{4}-\d{2}-\d{2}').all():
+            raise ValueError('Daily weather requires ISO calendar dates or M/D/YYYY')
+        metadata['source_date_format'] = date_format
+        dates = pd.to_datetime(observations.time, format=date_format, errors='raise')
         if dates.duplicated().any() or not dates.is_monotonic_increasing:
             raise ValueError('Duplicate or unordered daily weather dates')
         values = observations[daily_headers[1:]].astype(float).to_numpy()
@@ -39,6 +56,12 @@ def read_weather(path):
             raise ValueError('Invalid daily weather values')
         daily = pd.DataFrame({'date_gregorian': dates.dt.date,
             'apparent_temperature_mean_C': values[:, 0], 'wind_max_kmh': values[:, 1]})
+        if air_header in observations:
+            air = observations[air_header].astype(float).to_numpy()
+            if not np.isfinite(air).all():
+                raise ValueError('Invalid daily weather values')
+            daily['temperature_mean_C'] = air
+        metadata['available_temperature_columns'] = [c for c in daily if c.endswith('_mean_C')]
         metadata.update({'provider_variable_definition': 'daily_mean_apparent_temperature_and_max_wind',
             'adapter_version': 'daily_date_labels_v1', 'temperature_basis': 'apparent',
             'wind_statistic': 'maximum', 'day_alignment': 'source calendar date labels; no timezone conversion'})
@@ -86,6 +109,8 @@ def daily_integral(seconds, values, days, tz_name='Asia/Tehran', *, plot_directo
         daily['day_alignment'] = metadata['day_alignment']
         daily['weather_location_id'] = '_'.join(str(metadata.get(k,'')) for k in ['latitude','longitude','elevation'])
         daily['apparent_temperature_mean_F'] = daily.apparent_temperature_mean_C * 1.8 + 32
+        if 'temperature_mean_C' in daily:
+            daily['temperature_mean_F'] = daily.temperature_mean_C * 1.8 + 32
         daily['wind_max_mph'] = daily.wind_max_kmh / 1.609344
         if plot_directory is not None:
             if target_start is None or target_end_exclusive is None:
@@ -169,6 +194,8 @@ def save_daily_weather_plots(daily, directory, target_start, target_end_exclusiv
             ('apparent_temperature_mean_C', 'Daily mean apparent temperature', 'Apparent temperature (°C)', '#c2410c'),
             ('wind_max_kmh', 'Daily maximum wind speed', 'Maximum wind speed (km/h)', '#087f5b'),
         ]
+        if 'temperature_mean_C' in target:
+            plots.insert(0, ('temperature_mean_C', 'Daily mean temperature', 'Temperature (°C)', '#2563eb'))
     paths = []
     left, top, width, height = 100, 110, 930, 300
     for column, title, units, color in plots:
@@ -242,8 +269,11 @@ def weather_features(daily):
         'CDD65': cdd65,
     }
 
-def build_design(daily, preset, mask, mode, exposure, exposure_scaled=True, allow_zero_spread=False):
+def model_weather_features(daily, preset):
+    """Return the selected model features in their original, unscaled units."""
+    from .town_features import town_features
     presets = {
+        'town_custom_v1': [],
         'paper_section3_v1': ['intercept', 'HDD65', 'HDD55', 'HDDW65', 'CDD65'],
         'winter_hdd65_v1': ['intercept', 'HDD65'],
         'winter_hdd65_hddw65_v1': ['intercept', 'HDD65', 'HDDW65'],
@@ -253,12 +283,33 @@ def build_design(daily, preset, mask, mode, exposure, exposure_scaled=True, allo
     if preset not in presets:
         raise ValueError('Unregistered feature preset')
     columns = presets[preset]
-    if 'wind_max_kmh' in daily and preset not in ('daily_apparent_hdd65_v1', 'intercept_only_v1'):
+    if 'wind_max_kmh' in daily and preset not in ('daily_apparent_hdd65_v1', 'intercept_only_v1', 'town_custom_v1'):
         raise ValueError('Daily apparent-temperature input requires an explicit apparent-temperature preset; maximum wind is not mean wind')
     if preset == 'daily_apparent_hdd65_v1' and 'wind_max_kmh' not in daily:
         raise ValueError('Daily apparent-temperature preset requires daily weather input')
-    features = weather_features(daily)
-    design = np.column_stack([features[c] for c in columns])
+    features = town_features(daily) if preset == 'town_custom_v1' else weather_features(daily)
+    if preset == 'town_custom_v1':
+        columns = list(features)
+        if not columns or columns[0] != 'intercept' or not np.all(np.asarray(features['intercept']) == 1):
+            raise ValueError('Custom features must start with an intercept of ones')
+    return pd.DataFrame({c: features[c] for c in columns}, index=daily.index)
+
+
+def export_weather_features(daily, preset, path):
+    """Write daily weather inputs and the active features before model scaling."""
+    features = model_weather_features(daily, preset)
+    inputs = ['date_gregorian', 'weather_status', 'temperature_mean_C',
+              'apparent_temperature_mean_C', 'wind_max_kmh', 'wind_mean_kmh']
+    output = daily[[c for c in inputs if c in daily and c not in features]].copy()
+    output = pd.concat([output, features], axis=1)
+    output.to_csv(path, index=False)
+    return output
+
+
+def build_design(daily, preset, mask, mode, exposure, exposure_scaled=True, allow_zero_spread=False):
+    features = model_weather_features(daily, preset)
+    columns = list(features)
+    design = features.to_numpy(dtype=float, copy=True)
     metadata = {
         'temperature_basis': 'daily_mean_apparent' if 'wind_max_kmh' in daily else 'daily_mean_air',
         'features': columns,
