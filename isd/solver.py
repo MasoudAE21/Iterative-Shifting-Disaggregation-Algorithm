@@ -124,6 +124,8 @@ def interval_update(old, y, p, total, cfg):
         else:
             weights = residual / np.max(residual)
             proposed_allocation = total * (weights / sum_compensated.py_func(weights))
+            if cfg.redistribution_floor:
+                proposed_allocation = (1 - cfg.redistribution_floor) * proposed_allocation + cfg.redistribution_floor * (total / len(old))
             new_allocation = correct_roundoff(
                 (1 - cfg.alpha) * old + cfg.alpha * proposed_allocation,
                 total,
@@ -151,7 +153,7 @@ def reference_sweep(a, y, p, state, cfg):
     return int(noops)
 
 @njit(cache=True, fastmath=False)
-def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol):
+def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol, redistribution_floor=0.0):
     """Compiled sequential sweep matching the reference arithmetic order."""
     noops = 0
     for bill_index in range(len(starts)):
@@ -191,6 +193,8 @@ def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol):
         weight_sum = sum_compensated(residual)
         for day_offset in range(length):
             proposed_allocation = total * (residual[day_offset] / weight_sum)
+            if redistribution_floor:
+                proposed_allocation = (1 - redistribution_floor) * proposed_allocation + redistribution_floor * (total / length)
             a[offset + day_offset] = (1 - alpha) * a[offset + day_offset] + alpha * proposed_allocation
         delta = total - sum_compensated(a[offset:offset + length])
         if abs(delta) > atol + rtol * abs(total):
@@ -386,6 +390,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
                     cfg.alpha,
                     cfg.reconciliation_atol,
                     cfg.reconciliation_rtol,
+                    cfg.redistribution_floor,
                 )
             total_noops += cycle_noops
             outer_noops += cycle_noops

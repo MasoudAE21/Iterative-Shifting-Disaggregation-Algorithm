@@ -13,6 +13,8 @@ class Config:
     mode: str = 'provisional_cohort_isd'
     engine: str = 'scaled'
     alpha: float = 0.05
+    # Experimental reserved uniform share of every nonzero proposal.
+    redistribution_floor: float = 0.0
     n_lr_models: int = 10
     n_disagg_cycles: int = 10
     # The target is half-open; source bill endpoints remain inclusive.
@@ -64,6 +66,8 @@ class Config:
     tbs_path: str | None = None
 
     def validate(self):
+        if isinstance(self.redistribution_floor, bool) or not math.isfinite(self.redistribution_floor) or not 0 <= self.redistribution_floor <= 1:
+            raise ValueError('redistribution_floor must be finite and in [0, 1]')
         if not isinstance(self.export_customer_daily_csv, bool):
             raise ValueError('export_customer_daily_csv must be boolean')
         if self.bill_duration_scope not in ('all', 'boundary'):
