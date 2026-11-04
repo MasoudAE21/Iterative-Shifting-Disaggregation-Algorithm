@@ -222,8 +222,12 @@ def conservation_kernel(a, totals, offsets, atol, rtol):
             raise ArithmeticError('Allocation invariant failure')
     return max_discrepancy
 
-def initialize(state, cfg, storage=None):
+def initialize(state, cfg, storage=None, initial_weights=None):
     """Allocate each bill uniformly, optionally creating file-backed storage."""
+    if cfg.initialization == 'seasonal_hdd65':
+        initial_weights = np.asarray(initial_weights, dtype=np.float64)
+        if initial_weights.shape != (state.n_days,) or not np.isfinite(initial_weights).all() or np.any(initial_weights <= 0):
+            raise ValueError('Positive finite daily initial_weights required')
     size = int(state.offsets[-1])
     if storage and size * 8 > cfg.memmap_threshold_mb * 1024**2:
         allocations = np.memmap(storage, dtype=np.float64, mode='w+', shape=(size,))
@@ -233,6 +237,10 @@ def initialize(state, cfg, storage=None):
         offset = int(state.offsets[bill_index])
         length = int(state.lengths[bill_index])
         allocations[offset:offset + length] = total / length
+        if cfg.initialization == 'seasonal_hdd65':
+            weights = initial_weights[state.starts[bill_index]:state.starts[bill_index] + length]
+            weights = weights / weights.max()
+            allocations[offset:offset + length] = total * (weights / sum_compensated.py_func(weights))
         correct_roundoff(allocations[offset:offset + length], total, cfg)
     return allocations
 
@@ -281,7 +289,7 @@ def lstsq_diagnostics(X, y, mask, cfg):
         )
     return (beta, predicted, diagnostics)
 
-def state_lock(state, X, mask, cfg):
+def state_lock(state, X, mask, cfg, initial_weights=None):
     """Fingerprint inputs and settings for checkpoint compatibility, not payload integrity."""
     digest = hashlib.sha256()
     digest.update(state.identity_token.encode())
@@ -292,10 +300,14 @@ def state_lock(state, X, mask, cfg):
     settings.pop('checkpoint')
     settings.pop('engine')
     settings.pop('export_customer_daily_csv', None)
+    if cfg.initialization == 'uniform':
+        settings.pop('initialization')
+    else:
+        digest.update(np.ascontiguousarray(initial_weights, dtype=np.float64).tobytes())
     digest.update(json.dumps(settings, sort_keys=True).encode())
     return digest.hexdigest()
 
-def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop_after_cycles=None, exposure=None):
+def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop_after_cycles=None, exposure=None, initial_weights=None):
     """Fit fixed aggregate predictions and shift full bill intervals sequentially."""
     started_at = time.perf_counter()
     cfg.validate()
@@ -312,10 +324,10 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
     X.setflags(write=False)
     fit_rows = fit_rows.copy()
     fit_rows.setflags(write=False)
-    input_lock = state_lock(state, X, fit_rows, cfg)
+    input_lock = state_lock(state, X, fit_rows, cfg, initial_weights)
     aggregate_function = aggregate_kernel.py_func if cfg.engine == 'reference' else aggregate_kernel
     # Establish allocations before optionally restoring completed-cycle state.
-    allocations = initialize(state, cfg, storage)
+    allocations = initialize(state, cfg, storage, initial_weights)
     (daily_total, daily_count) = aggregate_function(
         allocations,
         state.starts,

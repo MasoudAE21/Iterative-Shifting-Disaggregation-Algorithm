@@ -13,6 +13,7 @@ class Config:
     mode: str = 'provisional_cohort_isd'
     engine: str = 'scaled'
     alpha: float = 0.05
+    initialization: str = 'uniform'
     n_lr_models: int = 10
     n_disagg_cycles: int = 10
     # The target is half-open; source bill endpoints remain inclusive.
@@ -64,6 +65,8 @@ class Config:
     tbs_path: str | None = None
 
     def validate(self):
+        if self.initialization not in ('uniform', 'seasonal_hdd65'):
+            raise ValueError('Unknown initialization')
         if not isinstance(self.export_customer_daily_csv, bool):
             raise ValueError('export_customer_daily_csv must be boolean')
         if self.bill_duration_scope not in ('all', 'boundary'):
