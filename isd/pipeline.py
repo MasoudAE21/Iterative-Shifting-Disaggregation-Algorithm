@@ -682,6 +682,9 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
             diagnostics,
         )
         stage_seconds['export_seconds'] = time.perf_counter() - stage_started_at
+        from .customer_reports import export_daily_csv
+        export_daily_csv(out / 'target_customer_daily.parquet', out / 'customer_daily_csv',
+                         enabled=cfg.export_customer_daily_csv)
         stage_rss['after_full_and_target_export'] = memory.process.memory_info().rss
         from .peak import export_peak
         stage_started_at = time.perf_counter()

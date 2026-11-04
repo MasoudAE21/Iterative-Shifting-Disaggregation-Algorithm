@@ -291,6 +291,7 @@ def state_lock(state, X, mask, cfg):
     settings.pop('resume')
     settings.pop('checkpoint')
     settings.pop('engine')
+    settings.pop('export_customer_daily_csv', None)
     digest.update(json.dumps(settings, sort_keys=True).encode())
     return digest.hexdigest()
 

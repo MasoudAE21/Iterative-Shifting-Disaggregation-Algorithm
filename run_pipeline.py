@@ -25,6 +25,7 @@ CONFIG = Config(
     n_lr_models=10,
     n_disagg_cycles=10,
     peak_mode='population',
+    export_customer_daily_csv=False,  # True writes customer_daily_csv/YYYY-MM.csv.
     bill_boundary_policy='monthly_weighted',
     bill_window='target',
     simulation_start='2023-12-01',

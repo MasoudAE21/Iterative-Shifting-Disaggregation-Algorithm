@@ -46,6 +46,8 @@ class Config:
     sample_seed: str = 'isd_pilot_v1:'
     # Select a shared population peak day or each customer's own peak day.
     peak_mode: str = 'population'
+    # Optional monthly CSV copies; the compact Parquet daily output is always kept.
+    export_customer_daily_csv: bool = False
     row_group_size: int = 100000
     ingestion_chunk_size: int = 100000
     memmap_threshold_mb: int = 256
@@ -62,6 +64,8 @@ class Config:
     tbs_path: str | None = None
 
     def validate(self):
+        if not isinstance(self.export_customer_daily_csv, bool):
+            raise ValueError('export_customer_daily_csv must be boolean')
         if self.bill_duration_scope not in ('all', 'boundary'):
             raise ValueError('Unknown bill duration scope')
         if self.bill_date_format not in ('%Y-%m-%d', '%m/%d/%Y'):

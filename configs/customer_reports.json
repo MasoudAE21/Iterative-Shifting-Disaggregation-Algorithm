@@ -1,0 +1,7 @@
+{
+  "run_directory": "outputs/experiment_all_types_05",
+  "output_directory": "outputs/experiment_all_types_05/customer_reports",
+  "peak_windows": {"dec2024_feb2025": ["2024-12-01", "2025-03-01"]},
+  "include_all_simulation": true,
+  "export_customer_daily_csv": true
+}

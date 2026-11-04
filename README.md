@@ -1,3 +1,29 @@
+## Accepted-run customer reports
+
+Run `python scripts/export_customer_reports.py --config configs/customer_reports.json`
+to extract reports from `experiment_all_types_05` without rerunning or changing
+its allocations. Settings select December 2024–February 2025 and the entire
+simulation. Results go into that run's `customer_reports/` subdirectory.
+Each window has `customers_on_town_peak_day.csv`, `individual_customer_peaks.csv`,
+and `population_daily_totals.csv`. The shared peak uses the accepted run's fixed
+full-target coverage cohort in both windows, not a changing daily population.
+Individual peaks use available days and include coverage counts; ties choose the
+earliest date. Missing estimates remain blank, and numeric zeros remain zero.
+The report manifest records dates, counts, units, and source hashes. Requested
+windows outside the saved target customer-day grid are rejected.
+
+Every selected customer's daily estimates already exist in
+`target_customer_daily.parquet`, including unavailable days and method/status
+fields. Set `export_customer_daily_csv` to `true` in the report config to also
+write monthly CSVs under `customer_reports/customer_daily_csv/`; set it to
+`false` to skip them (and remove previous monthly files owned by that exporter).
+The option is also available in pipeline `Config`, JSON overrides, and the IDE
+CONFIG in `run_pipeline.py` (default false). Pipeline CSVs go into
+`customer_daily_csv/` in the run directory and cover its target dates. Parquet is
+always retained. Monthly splitting keeps this Town run below Excel's row limit;
+import SubscriptionNumber as text to preserve leading zeros. These are modeled
+estimates for selected customers, not measured daily values for missing consumers.
+
 ## Current weighted partial-bill policy
 
 Town now uses `monthly_weighted` for January 2–February 28, 2025. For each partial bill:

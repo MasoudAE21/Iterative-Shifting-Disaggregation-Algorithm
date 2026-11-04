@@ -11,7 +11,7 @@
   "max_customers": null,
   "feature_preset": "town_custom_v1",
   "alpha": 0.05,
-  "n_lr_models": 50,
-  "n_disagg_cycles": 25,
+  "n_lr_models": 5,
+  "n_disagg_cycles": 5,
   "tbs_path": "data/prepared/TBS_Town_Q_daily_consumption.csv"
 }
