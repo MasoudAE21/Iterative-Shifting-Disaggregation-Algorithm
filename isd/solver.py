@@ -101,7 +101,7 @@ def correct_roundoff(a, total, cfg):
         raise ArithmeticError('Invalid corrected allocation')
     return a
 
-def interval_update(old, y, p, total, cfg):
+def interval_update(old, y, p, total, cfg, reference=None):
     """Hand-checkable Eq. 20-23 update, returning new, restored y, no-op flag."""
     other_contributions = y - old
     subtraction_tolerance = 64 * EPS * np.maximum(1, np.maximum(np.abs(y), np.abs(old)))
@@ -129,9 +129,15 @@ def interval_update(old, y, p, total, cfg):
                 total,
                 cfg,
             )
+    if cfg.individual_reference_strength and total > 0:
+        if reference is None:
+            raise ValueError('Individual reference is required')
+        new_allocation = correct_roundoff(
+            new_allocation + cfg.individual_reference_strength * (reference - new_allocation), total, cfg)
+        noop = False
     return (new_allocation, other_contributions + new_allocation, noop)
 
-def reference_sweep(a, y, p, state, cfg):
+def reference_sweep(a, y, p, state, cfg, reference_allocations=None):
     """Update bills sequentially in place; later bills see the latest aggregate."""
     noops = 0
     for bill_index in range(len(state.starts)):
@@ -144,6 +150,7 @@ def reference_sweep(a, y, p, state, cfg):
             p[day_start:day_start + length],
             state.totals[bill_index],
             cfg,
+            reference_allocations[offset:offset + length] if reference_allocations is not None else None,
         )
         a[offset:offset + length] = new_allocation
         y[day_start:day_start + length] = restored_aggregate
@@ -151,7 +158,7 @@ def reference_sweep(a, y, p, state, cfg):
     return int(noops)
 
 @njit(cache=True, fastmath=False)
-def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol):
+def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol, reference_allocations=None, individual_reference_strength=0.0):
     """Compiled sequential sweep matching the reference arithmetic order."""
     noops = 0
     for bill_index in range(len(starts)):
@@ -181,17 +188,19 @@ def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol):
                 a[offset + day_offset] = 0.0
                 y[day_start + day_offset] = other_contributions[day_offset]
             continue
-        if sum_compensated(residual) <= 64 * EPS * length * scale:
+        zero_residual = sum_compensated(residual) <= 64 * EPS * length * scale
+        if zero_residual and individual_reference_strength == 0:
             noops += 1
             for day_offset in range(length):
                 y[day_start + day_offset] = other_contributions[day_offset] + a[offset + day_offset]
             continue
-        for day_offset in range(length):
-            residual[day_offset] /= max_residual
-        weight_sum = sum_compensated(residual)
-        for day_offset in range(length):
-            proposed_allocation = total * (residual[day_offset] / weight_sum)
-            a[offset + day_offset] = (1 - alpha) * a[offset + day_offset] + alpha * proposed_allocation
+        if not zero_residual:
+            for day_offset in range(length):
+                residual[day_offset] /= max_residual
+            weight_sum = sum_compensated(residual)
+            for day_offset in range(length):
+                proposed_allocation = total * (residual[day_offset] / weight_sum)
+                a[offset + day_offset] = (1 - alpha) * a[offset + day_offset] + alpha * proposed_allocation
         delta = total - sum_compensated(a[offset:offset + length])
         if abs(delta) > atol + rtol * abs(total):
             raise ArithmeticError('Correction exceeds threshold')
@@ -200,6 +209,20 @@ def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol):
             if a[offset + day_offset] > a[offset + largest_index]:
                 largest_index = day_offset
         a[offset + largest_index] += delta
+        if individual_reference_strength:
+            if reference_allocations is None:
+                raise ValueError('Individual reference is required')
+            for day_offset in range(length):
+                value = a[offset + day_offset]
+                a[offset + day_offset] = value + individual_reference_strength * (reference_allocations[offset + day_offset] - value)
+            delta = total - sum_compensated(a[offset:offset + length])
+            if abs(delta) > atol + rtol * abs(total):
+                raise ArithmeticError('Individual reference correction exceeds threshold')
+            largest_index = 0
+            for day_offset in range(1, length):
+                if a[offset + day_offset] > a[offset + largest_index]:
+                    largest_index = day_offset
+            a[offset + largest_index] += delta
         for day_offset in range(length):
             if not np.isfinite(a[offset + day_offset]) or a[offset + day_offset] < 0:
                 raise ArithmeticError('Invalid allocation')
@@ -281,7 +304,7 @@ def lstsq_diagnostics(X, y, mask, cfg):
         )
     return (beta, predicted, diagnostics)
 
-def state_lock(state, X, mask, cfg):
+def state_lock(state, X, mask, cfg, reference_weights=None):
     """Fingerprint inputs and settings for checkpoint compatibility, not payload integrity."""
     digest = hashlib.sha256()
     digest.update(state.identity_token.encode())
@@ -292,10 +315,14 @@ def state_lock(state, X, mask, cfg):
     settings.pop('checkpoint')
     settings.pop('engine')
     settings.pop('export_customer_daily_csv', None)
+    if cfg.individual_reference_strength == 0:
+        settings.pop('individual_reference_strength')
+    else:
+        digest.update(np.ascontiguousarray(reference_weights, dtype=np.float64).tobytes())
     digest.update(json.dumps(settings, sort_keys=True).encode())
     return digest.hexdigest()
 
-def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop_after_cycles=None, exposure=None):
+def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop_after_cycles=None, exposure=None, reference_weights=None):
     """Fit fixed aggregate predictions and shift full bill intervals sequentially."""
     started_at = time.perf_counter()
     cfg.validate()
@@ -312,7 +339,17 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
     X.setflags(write=False)
     fit_rows = fit_rows.copy()
     fit_rows.setflags(write=False)
-    input_lock = state_lock(state, X, fit_rows, cfg)
+    reference_allocations = None
+    if cfg.individual_reference_strength:
+        reference_weights = np.asarray(reference_weights, dtype=np.float64)
+        if reference_weights.shape != (state.n_days,) or not np.isfinite(reference_weights).all() or np.any(reference_weights <= 0):
+            raise ValueError('Positive finite daily reference_weights required')
+        reference_allocations = np.empty(int(state.offsets[-1]), dtype=np.float64)
+        for k, total in enumerate(state.totals):
+            weights = reference_weights[state.starts[k]:state.starts[k] + state.lengths[k]]
+            weights = weights / weights.max()
+            reference_allocations[state.offsets[k]:state.offsets[k+1]] = correct_roundoff(total * (weights / sum_compensated.py_func(weights)), total, cfg)
+    input_lock = state_lock(state, X, fit_rows, cfg, reference_weights)
     aggregate_function = aggregate_kernel.py_func if cfg.engine == 'reference' else aggregate_kernel
     # Establish allocations before optionally restoring completed-cycle state.
     allocations = initialize(state, cfg, storage)
@@ -373,7 +410,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
         prediction_hash = hashlib.sha256(prediction.tobytes()).hexdigest()
         for cycle_index in range(first_cycle, cfg.n_disagg_cycles):
             if cfg.engine == 'reference':
-                cycle_noops = reference_sweep(allocations, daily_total, prediction, state, cfg)
+                cycle_noops = reference_sweep(allocations, daily_total, prediction, state, cfg, reference_allocations)
             else:
                 cycle_noops = scaled_sweep(
                     allocations,
@@ -386,6 +423,8 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
                     cfg.alpha,
                     cfg.reconciliation_atol,
                     cfg.reconciliation_rtol,
+                    reference_allocations,
+                    cfg.individual_reference_strength,
                 )
             total_noops += cycle_noops
             outer_noops += cycle_noops

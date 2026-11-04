@@ -13,6 +13,8 @@ class Config:
     mode: str = 'provisional_cohort_isd'
     engine: str = 'scaled'
     alpha: float = 0.05
+    # Fraction of the individual reference residual applied after each bill update.
+    individual_reference_strength: float = 0.0
     n_lr_models: int = 10
     n_disagg_cycles: int = 10
     # The target is half-open; source bill endpoints remain inclusive.
@@ -64,6 +66,8 @@ class Config:
     tbs_path: str | None = None
 
     def validate(self):
+        if isinstance(self.individual_reference_strength, bool) or not math.isfinite(self.individual_reference_strength) or not 0 <= self.individual_reference_strength <= 1:
+            raise ValueError('individual_reference_strength must be finite and in [0, 1]')
         if not isinstance(self.export_customer_daily_csv, bool):
             raise ValueError('export_customer_daily_csv must be boolean')
         if self.bill_duration_scope not in ('all', 'boundary'):

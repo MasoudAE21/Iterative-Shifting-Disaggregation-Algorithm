@@ -262,6 +262,7 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
                 state, design, cfg, fit_mask,
                 out / 'checkpoint.npz' if cfg.checkpoint else None,
                 out / 'allocations.memmap', exposure=exposure,
+                reference_weights=(1 + weather_features(daily)['HDD65']) if cfg.individual_reference_strength else None,
             )
         except AvailabilityError as e:
             if cfg.mode == 'paper_reference' or cfg.resume:
