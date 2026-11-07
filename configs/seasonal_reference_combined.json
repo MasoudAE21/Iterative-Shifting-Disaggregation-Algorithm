@@ -1,0 +1,11 @@
+{
+  "feature_preset": "town_custom_v1",
+  "initialization": "seasonal_reference",
+  "redistribution_floor": 0.10,
+  "individual_reference_strength": 0.03,
+  "alpha": 0.05,
+  "n_lr_models": 10,
+  "n_disagg_cycles": 10,
+  "checkpoint": false,
+  "export_customer_daily_csv": false
+}

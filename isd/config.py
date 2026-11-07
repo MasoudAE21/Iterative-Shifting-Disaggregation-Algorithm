@@ -64,8 +64,19 @@ class Config:
     tbs_fourier_harmonics: int = 3
     tbs_fourier_period_days: float = 365.2425
     tbs_path: str | None = None
+    initialization: str = 'uniform'
+    redistribution_floor: float = 0.0
+    individual_reference_strength: float = 0.0
 
     def validate(self):
+        if self.initialization not in ('uniform', 'seasonal_reference'):
+            raise ValueError('Unknown initialization')
+        for value in (self.redistribution_floor, self.individual_reference_strength):
+            if isinstance(value, bool) or not math.isfinite(value) or not 0 <= value <= 1:
+                raise ValueError('Reserve and correction must be finite fractions')
+        if self.mode == 'paper_reference' and (self.initialization != 'uniform' or
+                self.redistribution_floor or self.individual_reference_strength):
+            raise ValueError('Experimental corrections require cohort mode')
         if self.feature_preset in ("tbs_fourier_v1", "town_tbs_fourier_v1"):
             if not self.tbs_path:
                 raise ValueError("TBS Fourier features require tbs_path")

@@ -262,6 +262,8 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
                 state, design, cfg, fit_mask,
                 out / 'checkpoint.npz' if cfg.checkpoint else None,
                 out / 'allocations.memmap', exposure=exposure,
+                reference_weights=(1 + np.maximum(65 - (daily.apparent_temperature_mean_C.to_numpy() * 1.8 + 32), 0))
+                if cfg.initialization == 'seasonal_reference' or cfg.individual_reference_strength else None,
             )
         except AvailabilityError as e:
             if cfg.mode == 'paper_reference' or cfg.resume:
@@ -348,6 +350,8 @@ def export_outputs(selected, classes, daily, origin, cfg, out, run_id, modeled, 
                 else 'cohort_exposure_isd' if cfg.exposure_scaled
                 else 'cohort_masked_unscaled_isd'
             )
+            if cfg.initialization == 'seasonal_reference' or cfg.individual_reference_strength or cfg.redistribution_floor:
+                method = 'seasonal_reference_combined_isd'
             reason = 'none'
         else:
             allocations = correct_roundoff(np.full(length, total / length), total, cfg)

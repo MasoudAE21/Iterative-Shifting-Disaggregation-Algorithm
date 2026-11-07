@@ -112,7 +112,7 @@ def correct_roundoff(a, total, cfg):
         raise ArithmeticError('Invalid corrected allocation')
     return a
 
-def interval_update(old, y, p, total, cfg):
+def interval_update(old, y, p, total, cfg, reference=None):
     """Hand-checkable Eq. 20-23 update, returning new, restored y, no-op flag."""
     other_contributions = y - old
     subtraction_tolerance = 64 * EPS * np.maximum(1, np.maximum(np.abs(y), np.abs(old)))
@@ -135,14 +135,22 @@ def interval_update(old, y, p, total, cfg):
         else:
             weights = residual / np.max(residual)
             proposed_allocation = total * (weights / sum_compensated.py_func(weights))
+            proposed_allocation = ((1 - cfg.redistribution_floor) * proposed_allocation
+                                  + cfg.redistribution_floor * total / len(old))
             new_allocation = correct_roundoff(
                 (1 - cfg.alpha) * old + cfg.alpha * proposed_allocation,
                 total,
                 cfg,
             )
+    if cfg.individual_reference_strength and total > 0:
+        if reference is None:
+            raise ValueError('Individual reference required')
+        new_allocation = correct_roundoff((1 - cfg.individual_reference_strength) * new_allocation
+                                         + cfg.individual_reference_strength * reference, total, cfg)
+        noop = False
     return (new_allocation, other_contributions + new_allocation, noop)
 
-def reference_sweep(a, y, p, state, cfg):
+def reference_sweep(a, y, p, state, cfg, reference=None):
     """Update bills sequentially in place; later bills see the latest aggregate."""
     noops = 0
     for bill_index in range(len(state.starts)):
@@ -155,6 +163,7 @@ def reference_sweep(a, y, p, state, cfg):
             p[day_start:day_start + length],
             state.totals[bill_index],
             cfg,
+            reference[offset:offset + length] if reference is not None else None,
         )
         a[offset:offset + length] = new_allocation
         y[day_start:day_start + length] = restored_aggregate
@@ -162,7 +171,8 @@ def reference_sweep(a, y, p, state, cfg):
     return int(noops)
 
 @njit(cache=True, fastmath=False)
-def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol):
+def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol,
+                 redistribution_floor=0.0, reference=None, strength=0.0):
     """Compiled sequential sweep matching the reference arithmetic order."""
     noops = 0
     for bill_index in range(len(starts)):
@@ -192,17 +202,27 @@ def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol):
                 a[offset + day_offset] = 0.0
                 y[day_start + day_offset] = other_contributions[day_offset]
             continue
-        if sum_compensated(residual) <= 64 * EPS * length * scale:
-            noops += 1
+        zero_residual = sum_compensated(residual) <= 64 * EPS * length * scale
+        if zero_residual:
+            if strength == 0:
+                noops += 1
+                for day_offset in range(length):
+                    y[day_start + day_offset] = other_contributions[day_offset] + a[offset + day_offset]
+                continue
+        else:
             for day_offset in range(length):
-                y[day_start + day_offset] = other_contributions[day_offset] + a[offset + day_offset]
-            continue
-        for day_offset in range(length):
-            residual[day_offset] /= max_residual
-        weight_sum = sum_compensated(residual)
-        for day_offset in range(length):
-            proposed_allocation = total * (residual[day_offset] / weight_sum)
-            a[offset + day_offset] = (1 - alpha) * a[offset + day_offset] + alpha * proposed_allocation
+                residual[day_offset] /= max_residual
+            weight_sum = sum_compensated(residual)
+            for day_offset in range(length):
+                proposed_allocation = total * (residual[day_offset] / weight_sum)
+                proposed_allocation = (1 - redistribution_floor) * proposed_allocation + redistribution_floor * total / length
+                a[offset + day_offset] = (1 - alpha) * a[offset + day_offset] + alpha * proposed_allocation
+        if strength:
+            if reference is None:
+                raise ValueError('Individual reference required')
+            for day_offset in range(length):
+                a[offset + day_offset] = ((1 - strength) * a[offset + day_offset]
+                                         + strength * reference[offset + day_offset])
         delta = total - sum_compensated(a[offset:offset + length])
         if abs(delta) > atol + rtol * abs(total):
             raise ArithmeticError('Correction exceeds threshold')
@@ -233,7 +253,22 @@ def conservation_kernel(a, totals, offsets, atol, rtol):
             raise ArithmeticError('Allocation invariant failure')
     return max_discrepancy
 
-def initialize(state, cfg, storage=None):
+def seasonal_reference(state, weights, cfg):
+    """Positive seasonal shape with a bill-relative uniform reserve."""
+    weights = np.asarray(weights, dtype=float)
+    if weights.shape != (state.n_days,) or not np.isfinite(weights).all() or np.any(weights <= 0):
+        raise ValueError('Positive finite daily reference_weights required')
+    reference = np.empty(int(state.offsets[-1]))
+    for k, total in enumerate(state.totals):
+        w = weights[state.starts[k]:state.starts[k] + state.lengths[k]]
+        w = w / w.max()
+        shape = ((1 - cfg.redistribution_floor) * w / sum_compensated.py_func(w)
+                 + cfg.redistribution_floor / state.lengths[k])
+        reference[state.offsets[k]:state.offsets[k+1]] = correct_roundoff(total * shape, total, cfg)
+    return reference
+
+
+def initialize(state, cfg, storage=None, reference=None):
     """Allocate each bill uniformly, optionally creating file-backed storage."""
     size = int(state.offsets[-1])
     if storage and size * 8 > cfg.memmap_threshold_mb * 1024**2:
@@ -244,6 +279,10 @@ def initialize(state, cfg, storage=None):
         offset = int(state.offsets[bill_index])
         length = int(state.lengths[bill_index])
         allocations[offset:offset + length] = total / length
+        if cfg.initialization == 'seasonal_reference':
+            if reference is None:
+                raise ValueError('Seasonal reference required')
+            allocations[offset:offset + length] = reference[offset:offset + length]
         correct_roundoff(allocations[offset:offset + length], total, cfg)
     return allocations
 
@@ -292,7 +331,7 @@ def lstsq_diagnostics(X, y, mask, cfg):
         )
     return (beta, predicted, diagnostics)
 
-def state_lock(state, X, mask, cfg):
+def state_lock(state, X, mask, cfg, reference_weights=None):
     """Fingerprint inputs and settings for checkpoint compatibility, not payload integrity."""
     digest = hashlib.sha256()
     digest.update(state.identity_token.encode())
@@ -303,10 +342,17 @@ def state_lock(state, X, mask, cfg):
     settings.pop('checkpoint')
     settings.pop('engine')
     settings.pop('export_customer_daily_csv', None)
+    for key, default in [('initialization', 'uniform'), ('redistribution_floor', 0.0),
+                         ('individual_reference_strength', 0.0)]:
+        if settings[key] == default:
+            settings.pop(key)
+    if reference_weights is not None:
+        digest.update(np.ascontiguousarray(reference_weights, dtype=np.float64).tobytes())
     digest.update(json.dumps(settings, sort_keys=True).encode())
     return digest.hexdigest()
 
-def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop_after_cycles=None, exposure=None):
+def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop_after_cycles=None, exposure=None,
+          reference_weights=None):
     """Fit fixed aggregate predictions and shift full bill intervals sequentially."""
     started_at = time.perf_counter()
     cfg.validate()
@@ -323,10 +369,15 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
     X.setflags(write=False)
     fit_rows = fit_rows.copy()
     fit_rows.setflags(write=False)
-    input_lock = state_lock(state, X, fit_rows, cfg)
+    reference = None
+    if cfg.initialization == 'seasonal_reference' or cfg.individual_reference_strength:
+        reference = seasonal_reference(state, reference_weights, cfg)
+    else:
+        reference_weights = None
+    input_lock = state_lock(state, X, fit_rows, cfg, reference_weights)
     aggregate_function = aggregate_kernel.py_func if cfg.engine == 'reference' else aggregate_kernel
     # Establish allocations before optionally restoring completed-cycle state.
-    allocations = initialize(state, cfg, storage)
+    allocations = initialize(state, cfg, storage, reference)
     (daily_total, daily_count) = aggregate_function(
         allocations,
         state.starts,
@@ -384,7 +435,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
         prediction_hash = hashlib.sha256(prediction.tobytes()).hexdigest()
         for cycle_index in range(first_cycle, cfg.n_disagg_cycles):
             if cfg.engine == 'reference':
-                cycle_noops = reference_sweep(allocations, daily_total, prediction, state, cfg)
+                cycle_noops = reference_sweep(allocations, daily_total, prediction, state, cfg, reference)
             else:
                 cycle_noops = scaled_sweep(
                     allocations,
@@ -397,6 +448,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
                     cfg.alpha,
                     cfg.reconciliation_atol,
                     cfg.reconciliation_rtol,
+                    cfg.redistribution_floor, reference, cfg.individual_reference_strength,
                 )
             total_noops += cycle_noops
             outer_noops += cycle_noops

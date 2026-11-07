@@ -25,7 +25,7 @@ def test_recovers_curve_with_missing_observation(tmp_path):
 def test_combined_fourier_and_town_features():
     from isd.weather import model_weather_features, build_design
     daily = pd.DataFrame({
-        'apparent_temperature_mean_C': [1., 3., 7., 2.],
+        'apparent_temperature_mean_C': [1., 3., 25., 2.],
         'wind_max_kmh': [2., 9., 5., 12.],
         'TBS_fourier': [100., 120., 90., 110.],
     })
