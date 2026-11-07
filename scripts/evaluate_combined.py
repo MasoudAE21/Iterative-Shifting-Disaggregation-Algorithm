@@ -37,6 +37,11 @@ def evaluate(folder, baseline=None):
     peak = daily.groupby('bill_id').estimated_consumption.max()
     means = bills.Consumption / bills.day_count
     ratios = (peak/means).replace([np.inf, -np.inf], np.nan).dropna()
+    daily_ratios = (daily.estimated_consumption/daily.bill_id.map(means)).replace([np.inf, -np.inf], np.nan)
+    minimum_ratio = float(daily_ratios.min())
+    reserve = manifest['configuration'].get('redistribution_floor', 0.)
+    if not baseline:
+        assert minimum_ratio >= reserve - 1e-10, 'Uniform reserve violated'
     agg = pd.read_parquet(folder/'aggregate_daily.parquet')
     baseline_totals = {}
     for column in ['uniform_baseline_sum', 'weather_weighted_baseline_sum']:
@@ -67,9 +72,11 @@ def evaluate(folder, baseline=None):
                    near_zero_positive_winter_bills=int((positive_winter < 1e-10).sum()),
                    positive_winter_bills=len(positive_winter),
                    p90_peak_mean=float(ratios.quantile(.9)), p99_peak_mean=float(ratios.quantile(.99)),
-                   null_customer_days=null_count, wall_seconds=manifest['wall_seconds'],
+                   minimum_daily_bill_mean_ratio=minimum_ratio,
+                   null_customer_days=null_count, wall_seconds=None if baseline else manifest['wall_seconds'],
                    modeled_bills=manifest['model_diagnostics']['modeled_bills'],
                    fallback_reason=manifest['model_diagnostics']['fallback_reason'],
+                   tbs_role='Validation only' if baseline else tbs.get('evaluation', 'Validation only'),
                    **{k: tbs.get(k) for k in ['bias_m3', 'mae_m3', 'rmse_m3']}, **baseline_totals)
     (folder/f'evaluation_{suffix}.json').write_text(json.dumps(metrics, indent=2))
     return metrics

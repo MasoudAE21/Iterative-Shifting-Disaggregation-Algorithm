@@ -28,7 +28,7 @@ checks identical effective ledgers, records winter-collapse counts (all availabl
 December–February days), bill peak/mean quantiles, missing customer-day counts,
 customer peak dates, matched TBS errors and runtime. Uniform and seasonal
 baselines use the same ledger; seasonal weights have no uniform reserve.
-Their runtime field is the source pipeline runtime, not a separate baseline timing.
+Their runtime field is blank because standalone baseline timing is not measured.
 Customer peak-date agreement is measured against the first supplied run.
 TBS is independent validation for this branch. Synthetic known-truth scores
 measure reconstruction on constructed scenarios, not real-customer accuracy.
