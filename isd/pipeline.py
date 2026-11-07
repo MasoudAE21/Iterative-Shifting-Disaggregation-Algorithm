@@ -639,6 +639,10 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
             target_start=cfg.target_start,
             target_end_exclusive=cfg.target_end_exclusive,
         )
+        if cfg.feature_preset in ('tbs_fourier_v1', 'town_tbs_fourier_v1'):
+            from .fourier import fit_tbs_fourier
+            daily['TBS_fourier'], fourier_info = fit_tbs_fourier(root / cfg.tbs_path, daily.date_gregorian, cfg)
+            (out / 'tbs_fourier_fit.json').write_text(json.dumps(fourier_info, indent=2), encoding='utf-8')
         daily.to_parquet(out / 'daily_weather.parquet', index=False)
         export_weather_features(daily, cfg.feature_preset, out / 'weather_features.csv')
         stage_seconds['weather_seconds'] = time.perf_counter() - stage_started_at

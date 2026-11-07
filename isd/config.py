@@ -61,9 +61,18 @@ class Config:
     max_bill_days: int | None = None
     bill_duration_scope: str = 'all'
     bill_date_format: str = '%Y-%m-%d'
+    tbs_fourier_harmonics: int = 3
+    tbs_fourier_period_days: float = 365.2425
     tbs_path: str | None = None
 
     def validate(self):
+        if self.feature_preset in ("tbs_fourier_v1", "town_tbs_fourier_v1"):
+            if not self.tbs_path:
+                raise ValueError("TBS Fourier features require tbs_path")
+            if isinstance(self.tbs_fourier_harmonics, bool) or not isinstance(self.tbs_fourier_harmonics, int) or self.tbs_fourier_harmonics < 1:
+                raise ValueError("Fourier harmonics must be a positive integer")
+            if not math.isfinite(self.tbs_fourier_period_days) or self.tbs_fourier_period_days <= 0:
+                raise ValueError("Fourier period must be finite and positive")
         if not isinstance(self.export_customer_daily_csv, bool):
             raise ValueError('export_customer_daily_csv must be boolean')
         if self.bill_duration_scope not in ('all', 'boundary'):
@@ -83,6 +92,8 @@ class Config:
         if self.peak_mode not in ('population', 'individual'):
             raise ValueError('Unknown peak mode')
         if self.feature_preset not in (
+            'tbs_fourier_v1',
+            'town_tbs_fourier_v1',
             'town_custom_v1',
             'paper_section3_v1',
             'winter_hdd65_v1',

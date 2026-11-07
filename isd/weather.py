@@ -271,9 +271,12 @@ def weather_features(daily):
 
 def model_weather_features(daily, preset):
     """Return the selected model features in their original, unscaled units."""
+    if preset == "tbs_fourier_v1":
+        return pd.DataFrame({"intercept": np.ones(len(daily)), "TBS_fourier": daily["TBS_fourier"]}, index=daily.index)
     from .town_features import town_features
     presets = {
         'town_custom_v1': [],
+        'town_tbs_fourier_v1': [],
         'paper_section3_v1': ['intercept', 'HDD65', 'HDD55', 'HDDW65', 'CDD65'],
         'winter_hdd65_v1': ['intercept', 'HDD65'],
         'winter_hdd65_hddw65_v1': ['intercept', 'HDD65', 'HDDW65'],
@@ -283,12 +286,12 @@ def model_weather_features(daily, preset):
     if preset not in presets:
         raise ValueError('Unregistered feature preset')
     columns = presets[preset]
-    if 'wind_max_kmh' in daily and preset not in ('daily_apparent_hdd65_v1', 'intercept_only_v1', 'town_custom_v1'):
+    if 'wind_max_kmh' in daily and preset not in ('daily_apparent_hdd65_v1', 'intercept_only_v1', 'town_custom_v1', 'town_tbs_fourier_v1'):
         raise ValueError('Daily apparent-temperature input requires an explicit apparent-temperature preset; maximum wind is not mean wind')
     if preset == 'daily_apparent_hdd65_v1' and 'wind_max_kmh' not in daily:
         raise ValueError('Daily apparent-temperature preset requires daily weather input')
-    features = town_features(daily) if preset == 'town_custom_v1' else weather_features(daily)
-    if preset == 'town_custom_v1':
+    features = town_features(daily, include_fourier=True) if preset == 'town_tbs_fourier_v1' else (town_features(daily) if preset == 'town_custom_v1' else weather_features(daily))
+    if preset in ('town_custom_v1', 'town_tbs_fourier_v1'):
         columns = list(features)
         if not columns or columns[0] != 'intercept' or not np.all(np.asarray(features['intercept']) == 1):
             raise ValueError('Custom features must start with an intercept of ones')
