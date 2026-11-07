@@ -11,6 +11,17 @@ from .errors import AvailabilityError
 from .config import Config
 EPS=np.finfo(np.float64).eps
 
+def _replace_checkpoint(temporary_checkpoint, checkpoint_path):
+    """Keep atomic replacement while tolerating brief Windows file locks."""
+    for attempt in range(8):
+        try:
+            temporary_checkpoint.replace(checkpoint_path)
+            return
+        except PermissionError as error:
+            if getattr(error, 'winerror', None) not in (5, 32, 33) or attempt == 7:
+                raise
+            time.sleep(min(0.1 * 2 ** attempt, 1.0))
+
 @dataclass
 class State:
     """Bill constraints and storage layout, treated as fixed during solving.
@@ -449,7 +460,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
                         source_order_identity=state.identity_token,
                         config_json=json.dumps(cfg.as_dict()),
                     )
-                temporary_checkpoint.replace(checkpoint_path)
+                _replace_checkpoint(temporary_checkpoint, checkpoint_path)
             if stop_after_cycles and executed_cycles >= stop_after_cycles:
                 return Result(
                     allocations,

@@ -6,6 +6,38 @@ from isd.config import Config
 from isd.solver import State,solve,interval_update,reference_sweep,scaled_sweep,lstsq_diagnostics,initialize,aggregate_kernel
 
 def cfg(**kw): return Config(mode='paper_reference',feature_preset='paper_section3_v1',checkpoint=False,engine='reference',**kw)
+
+@pytest.mark.parametrize('failures', [2, 8])
+def test_checkpoint_windows_lock_retry(tmp_path, monkeypatch, failures):
+    from pathlib import Path
+    from isd import solver
+    target = tmp_path / 'checkpoint.npz'
+    temporary = tmp_path / 'checkpoint.npz.tmp'
+    target.write_bytes(b'previous')
+    temporary.write_bytes(b'completed cycle')
+    original_replace = Path.replace
+    attempts = []
+
+    def locked_replace(source, destination):
+        attempts.append(1)
+        if len(attempts) <= failures:
+            error = PermissionError('File locked')
+            error.winerror = 5
+            raise error
+        return original_replace(source, destination)
+
+    monkeypatch.setattr(Path, 'replace', locked_replace)
+    monkeypatch.setattr(solver.time, 'sleep', lambda seconds: None)
+    if failures == 8:
+        with pytest.raises(PermissionError):
+            solver._replace_checkpoint(temporary, target)
+        assert target.read_bytes() == b'previous'
+        assert temporary.read_bytes() == b'completed cycle'
+    else:
+        solver._replace_checkpoint(temporary, target)
+        assert target.read_bytes() == b'completed cycle'
+        assert not temporary.exists()
+    assert len(attempts) == min(failures + 1, 8)
 def state(starts,lengths,totals,n):
     return State(np.array(starts,np.int64),np.array(lengths,np.int64),np.array(totals,float),np.r_[0,np.cumsum(lengths)].astype(np.int64),n)
 
