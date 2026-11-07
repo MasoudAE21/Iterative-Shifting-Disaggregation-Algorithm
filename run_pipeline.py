@@ -52,7 +52,7 @@ def main():
 
     # Partial JSON overrides the current Town configuration, never legacy defaults.
     config = (
-        replace(CONFIG, **json.loads(args.config.read_text(encoding='utf-8')))
+        replace(CONFIG, **json.loads(args.config.read_text(encoding='utf-8-sig')))
         if args.config else CONFIG
     )
     overrides = {}

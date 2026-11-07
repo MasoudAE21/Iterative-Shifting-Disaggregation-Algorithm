@@ -89,6 +89,7 @@ class Config:
         if self.feature_preset not in (
             'town_custom_v1',
             'paper_section3_v1',
+            'paper_section3_daily_air_maxwind_v1',
             'winter_hdd65_v1',
             'winter_hdd65_hddw65_v1',
             'intercept_only_v1',

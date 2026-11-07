@@ -275,6 +275,7 @@ def model_weather_features(daily, preset):
     presets = {
         'town_custom_v1': [],
         'paper_section3_v1': ['intercept', 'HDD65', 'HDD55', 'HDDW65', 'CDD65'],
+        'paper_section3_daily_air_maxwind_v1': ['intercept', 'HDD65', 'HDD55', 'HDDW65', 'CDD65'],
         'winter_hdd65_v1': ['intercept', 'HDD65'],
         'winter_hdd65_hddw65_v1': ['intercept', 'HDD65', 'HDDW65'],
         'intercept_only_v1': ['intercept'],
@@ -283,6 +284,17 @@ def model_weather_features(daily, preset):
     if preset not in presets:
         raise ValueError('Unregistered feature preset')
     columns = presets[preset]
+    if preset == 'paper_section3_daily_air_maxwind_v1':
+        # Explicitly approved maximum-wind substitution; preserve the paper
+        # feature formulas and convert source km/h to mph before the breakpoint.
+        if not {'temperature_mean_C', 'wind_max_kmh'}.issubset(daily.columns):
+            raise ValueError('Daily paper features require mean air temperature and maximum wind')
+        reference_daily = pd.DataFrame({
+            'temperature_mean_F': daily.temperature_mean_C * 1.8 + 32,
+            'wind_mean_mph': daily.wind_max_kmh / 1.609344,
+        }, index=daily.index)
+        features = weather_features(reference_daily)
+        return pd.DataFrame({c: features[c] for c in columns}, index=daily.index)
     if 'wind_max_kmh' in daily and preset not in ('daily_apparent_hdd65_v1', 'intercept_only_v1', 'town_custom_v1'):
         raise ValueError('Daily apparent-temperature input requires an explicit apparent-temperature preset; maximum wind is not mean wind')
     if preset == 'daily_apparent_hdd65_v1' and 'wind_max_kmh' not in daily:
@@ -317,6 +329,14 @@ def build_design(daily, preset, mask, mode, exposure, exposure_scaled=True, allo
         'population_std': [1.0] * len(columns),
         'exposure_scaled_design': mode != 'paper_reference' and exposure_scaled,
     }
+    if preset == 'paper_section3_daily_air_maxwind_v1':
+        metadata.update({
+            'temperature_basis': 'daily_mean_air',
+            'wind_statistic': 'maximum',
+            'wind_formula_unit': 'mph',
+            'wind_conversion': 'wind_max_kmh / 1.609344',
+            'paper_feature_input_adaptation': 'maximum wind substituted for mean wind',
+        })
     if not np.isfinite(design).all():
         raise AvailabilityError('weather_unavailable: whole interval requires weather')
     if mode != 'paper_reference':
