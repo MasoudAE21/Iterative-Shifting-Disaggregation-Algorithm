@@ -188,6 +188,13 @@ def population(df, cfg):
         ),
     }
 
+def customer_weather_design(daily):
+    from .town_features import town_features
+    features = town_features(daily)
+    return np.column_stack([features[name] for name in
+                            ['intercept', 'HDD65', 'CDD65', 'HDDpW65', 'HDD65_ma3']])
+
+
 def allocate_model(accepted, classes, daily, origin, cfg, out):
     """Prepare the modeled population and solve, allowing cohort availability fallback.
 
@@ -221,6 +228,10 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
         'modeled_customers': len(cohort_ids),
         'modeled_bills': len(modeled),
         'fallback_reason': None,
+        'customer_model': cfg.customer_model,
+        'customer_weather_features': ['intercept', 'HDD65', 'CDD65', 'HDDpW65', 'HDD65_ma3']
+        if cfg.customer_model != 'none' else [],
+        'customer_model_interpretation': 'Smoothing generated allocations, not independent customer measurements',
     }
     result = None
     design = None
@@ -264,6 +275,9 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
                 out / 'allocations.memmap', exposure=exposure,
                 reference_weights=(1 + np.maximum(65 - (daily.apparent_temperature_mean_C.to_numpy() * 1.8 + 32), 0))
                 if cfg.initialization == 'seasonal_reference' or cfg.individual_reference_strength else None,
+                customer_groups=pd.factorize(modeled.SubscriptionNumber, sort=False)[0].astype(np.int64)
+                if cfg.customer_model != 'none' else None,
+                customer_design=customer_weather_design(daily) if cfg.customer_model != 'none' else None,
             )
         except AvailabilityError as e:
             if cfg.mode == 'paper_reference' or cfg.resume:
@@ -352,6 +366,8 @@ def export_outputs(selected, classes, daily, origin, cfg, out, run_id, modeled, 
             )
             if cfg.initialization == 'seasonal_reference' or cfg.individual_reference_strength or cfg.redistribution_floor:
                 method = 'seasonal_reference_combined_isd'
+            if cfg.customer_model != 'none':
+                method = 'fourier_customer_weather_isd'
             reason = 'none'
         else:
             allocations = correct_roundoff(np.full(length, total / length), total, cfg)
@@ -782,6 +798,8 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
         roster_path = root / 'data/prepared/Customers_Town_Q.csv'
         manifest['tbs_comparison'] = compare_tbs(root / cfg.tbs_path, out, cfg,
                                                roster_path=roster_path if roster_path.is_file() else None)
+        if cfg.feature_preset in ('tbs_fourier_v1', 'town_tbs_fourier_v1'):
+            manifest['tbs_comparison']['evaluation'] = 'In-sample reconstruction: measured TBS is a model input'
     write_json(out / 'run_manifest.json', manifest)
     from .peak import write_peak_summary
     write_peak_summary(out, manifest)

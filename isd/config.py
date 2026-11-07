@@ -67,8 +67,16 @@ class Config:
     initialization: str = 'uniform'
     redistribution_floor: float = 0.0
     individual_reference_strength: float = 0.0
+    customer_model: str = 'none'
+    customer_ridge_penalty: float = 1.0
 
     def validate(self):
+        if self.customer_model not in ('none', 'weather_ridge'):
+            raise ValueError('Unknown customer model')
+        if isinstance(self.customer_ridge_penalty, bool) or not math.isfinite(self.customer_ridge_penalty) or self.customer_ridge_penalty <= 0:
+            raise ValueError('Customer ridge penalty must be positive and finite')
+        if self.mode == 'paper_reference' and self.customer_model != 'none':
+            raise ValueError('Customer smoothing requires cohort mode')
         if self.initialization not in ('uniform', 'seasonal_reference'):
             raise ValueError('Unknown initialization')
         for value in (self.redistribution_floor, self.individual_reference_strength):

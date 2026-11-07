@@ -1,0 +1,15 @@
+{
+  "feature_preset": "tbs_fourier_v1",
+  "tbs_fourier_harmonics": 5,
+  "tbs_fourier_period_days": 365.2425,
+  "initialization": "seasonal_reference",
+  "redistribution_floor": 0.10,
+  "individual_reference_strength": 0.03,
+  "customer_model": "weather_ridge",
+  "customer_ridge_penalty": 1.0,
+  "alpha": 0.05,
+  "n_lr_models": 10,
+  "n_disagg_cycles": 10,
+  "checkpoint": false,
+  "export_customer_daily_csv": false
+}

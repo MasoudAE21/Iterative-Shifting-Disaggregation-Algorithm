@@ -1,8 +1,9 @@
 """Section 3, Eqs. 9, 12, 18-23. One immutable prediction per outer fit.
 Reference uses readable NumPy interval updates; scaled uses sequential Numba loops.
-No customer batching, parallel sweeps, normal equations, or prediction mutation.
+Aggregate fits retain SVD least squares and immutable predictions. The optional
+customer ridge phase runs only after a complete sequential aggregate sweep.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 import hashlib, json, math, time
 import numpy as np
@@ -331,7 +332,7 @@ def lstsq_diagnostics(X, y, mask, cfg):
         )
     return (beta, predicted, diagnostics)
 
-def state_lock(state, X, mask, cfg, reference_weights=None):
+def state_lock(state, X, mask, cfg, reference_weights=None, customer_groups=None, customer_design=None):
     """Fingerprint inputs and settings for checkpoint compatibility, not payload integrity."""
     digest = hashlib.sha256()
     digest.update(state.identity_token.encode())
@@ -343,16 +344,20 @@ def state_lock(state, X, mask, cfg, reference_weights=None):
     settings.pop('engine')
     settings.pop('export_customer_daily_csv', None)
     for key, default in [('initialization', 'uniform'), ('redistribution_floor', 0.0),
-                         ('individual_reference_strength', 0.0)]:
+                         ('individual_reference_strength', 0.0), ('customer_model', 'none'),
+                         ('customer_ridge_penalty', 1.0)]:
         if settings[key] == default:
             settings.pop(key)
     if reference_weights is not None:
         digest.update(np.ascontiguousarray(reference_weights, dtype=np.float64).tobytes())
+    if cfg.customer_model != 'none':
+        digest.update(np.ascontiguousarray(customer_groups, dtype=np.int64).tobytes())
+        digest.update(np.ascontiguousarray(customer_design, dtype=np.float64).tobytes())
     digest.update(json.dumps(settings, sort_keys=True).encode())
     return digest.hexdigest()
 
 def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop_after_cycles=None, exposure=None,
-          reference_weights=None):
+          reference_weights=None, customer_groups=None, customer_design=None):
     """Fit fixed aggregate predictions and shift full bill intervals sequentially."""
     started_at = time.perf_counter()
     cfg.validate()
@@ -374,7 +379,15 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
         reference = seasonal_reference(state, reference_weights, cfg)
     else:
         reference_weights = None
-    input_lock = state_lock(state, X, fit_rows, cfg, reference_weights)
+    customer_plan = None
+    sweep_cfg = cfg
+    if cfg.customer_model != 'none':
+        from .customer_weather import prepare_customer_model
+        customer_plan = prepare_customer_model(state, customer_groups, customer_design, cfg.customer_ridge_penalty)
+        sweep_cfg = replace(cfg, individual_reference_strength=0.)
+        if cfg.individual_reference_strength == 0:
+            customer_plan = None
+    input_lock = state_lock(state, X, fit_rows, cfg, reference_weights, customer_groups, customer_design)
     aggregate_function = aggregate_kernel.py_func if cfg.engine == 'reference' else aggregate_kernel
     # Establish allocations before optionally restoring completed-cycle state.
     allocations = initialize(state, cfg, storage, reference)
@@ -435,7 +448,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
         prediction_hash = hashlib.sha256(prediction.tobytes()).hexdigest()
         for cycle_index in range(first_cycle, cfg.n_disagg_cycles):
             if cfg.engine == 'reference':
-                cycle_noops = reference_sweep(allocations, daily_total, prediction, state, cfg, reference)
+                cycle_noops = reference_sweep(allocations, daily_total, prediction, state, sweep_cfg, reference)
             else:
                 cycle_noops = scaled_sweep(
                     allocations,
@@ -448,7 +461,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
                     cfg.alpha,
                     cfg.reconciliation_atol,
                     cfg.reconciliation_rtol,
-                    cfg.redistribution_floor, reference, cfg.individual_reference_strength,
+                    cfg.redistribution_floor, reference, sweep_cfg.individual_reference_strength,
                 )
             total_noops += cycle_noops
             outer_noops += cycle_noops
@@ -474,6 +487,18 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
                 raise ArithmeticError('Aggregate drift exceeds summation bound')
             if hashlib.sha256(prediction.tobytes()).hexdigest() != prediction_hash:
                 raise ArithmeticError('Prediction mutated')
+            customer_fallbacks = 0
+            if customer_plan is not None:
+                from .customer_weather import customer_weather_sweep
+                customer_function = customer_weather_sweep.py_func if cfg.engine == 'reference' else customer_weather_sweep
+                customer_fallbacks = customer_function(
+                    allocations, state.starts, state.lengths, state.offsets, state.totals, reference,
+                    *customer_plan, cfg.redistribution_floor, cfg.individual_reference_strength,
+                    cfg.reconciliation_atol, cfg.reconciliation_rtol)
+                max_bill_error = conservation_kernel(allocations, state.totals, state.offsets,
+                                                     cfg.reconciliation_atol, cfg.reconciliation_rtol)
+                recomputed_total, daily_count = aggregate_function(
+                    allocations, state.starts, state.lengths, state.offsets, state.n_days)
             daily_total = recomputed_total
             cycle_diagnostics.append(
                 {
@@ -483,6 +508,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
                     'max_bill_abs_error': float(max_bill_error),
                     'max_aggregate_discrepancy': float(aggregate_discrepancy.max()),
                     'max_aggregate_bound': float(drift_bound.max()),
+                    'customer_reference_fallback_bills': int(customer_fallbacks),
                 },
             )
             executed_cycles += 1
