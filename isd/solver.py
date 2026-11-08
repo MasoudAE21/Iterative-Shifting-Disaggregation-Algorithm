@@ -403,6 +403,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
         cycle_diagnostics = json.loads(str(resume_data['cycles']))
         total_noops = int(resume_data['noops'])
     if np.all(state.totals == 0):
+        print('ISD: all bill totals are zero; no LR models or disaggregation cycles needed.', flush=True)
         return Result(
             allocations,
             daily_total,
@@ -417,6 +418,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
     first_outer = int(resume_data['outer']) if resume_data is not None else 0
     # Each outer fit supplies one prediction shared by all its shifting cycles.
     for outer_index in range(first_outer, cfg.n_lr_models):
+        print(f'ISD: LR model {outer_index + 1}/{cfg.n_lr_models} starting', flush=True)
         if resume_data is not None and outer_index == first_outer:
             beta = resume_data['beta']
             prediction = resume_data['prediction'].copy()
@@ -513,6 +515,15 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
                         config_json=json.dumps(cfg.as_dict()),
                     )
                 _replace_checkpoint(temporary_checkpoint, checkpoint_path)
+            # completed_cycles = outer_index * cfg.n_disagg_cycles + cycle_index + 1
+            # total_cycles = cfg.n_lr_models * cfg.n_disagg_cycles
+            # print(
+            #     f'ISD: LR model {outer_index + 1}/{cfg.n_lr_models} | '
+            #     f'disagg cycle {cycle_index + 1}/{cfg.n_disagg_cycles} done | '
+            #     f'total cycles {completed_cycles}/{total_cycles} '
+            #     f'({100 * completed_cycles / total_cycles:.1f}%)',
+            #     flush=True,
+            # )
             if stop_after_cycles and executed_cycles >= stop_after_cycles:
                 return Result(
                     allocations,
@@ -548,6 +559,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
             },
         )
         iteration_diagnostics.append(fit_info)
+        print(f'ISD: LR models completed {outer_index + 1}/{cfg.n_lr_models}', flush=True)
         resume_data = None
     return Result(
         allocations,

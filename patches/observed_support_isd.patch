@@ -1,0 +1,65 @@
+diff --git a/isd/config.py b/isd/config.py
+index a6c7f4f..000aa00 100644
+--- a/isd/config.py
++++ b/isd/config.py
+@@ -134,3 +134,3 @@ class Config:
+             self.ordering_version != 'customer_start_end_bill_id_v1'
+-            or self.coverage_policy != 'balanced_cohort_uniform_elsewhere_v1'
++            or self.coverage_policy not in ('balanced_cohort_uniform_elsewhere_v1', 'observed_support_isd_v1')
+             or self.residual_tolerance_policy != '64eps_length_max_scale_v1'
+@@ -138,2 +138,4 @@ class Config:
+             raise ValueError('Unregistered policy requires a separate adaptation')
++        if self.coverage_policy == 'observed_support_isd_v1' and not self.exposure_scaled:
++            raise ValueError('Observed-support modeling requires exposure scaling')
+         if self.regression_rcond is not None and not 0 <= self.regression_rcond < 1:
+diff --git a/isd/data.py b/isd/data.py
+index b85e410..0c6ade7 100644
+--- a/isd/data.py
++++ b/isd/data.py
+@@ -155,3 +155,7 @@ def audit_normalized(df, deduplicate_confirmed=False, *, cfg=None):
+     )
+-    quarantine = conflict_customers | duplicate_customers | invalid_customers | target_gap_customers
++    gap_quarantine = (set() if config.coverage_policy == 'observed_support_isd_v1'
++                      else target_gap_customers)
++    quarantine = conflict_customers | duplicate_customers | invalid_customers | gap_quarantine
++    if config.coverage_policy == 'observed_support_isd_v1':
++        audited['internal_target_gap'] = audited.SubscriptionNumber.isin(target_gap_customers)
+     # Preserve existing rejection statuses; quarantine the remaining accepted history.
+@@ -178,2 +182,3 @@ def audit_normalized(df, deduplicate_confirmed=False, *, cfg=None):
+         'internal_target_gap_customers': len(target_gap_customers),
++        'internal_target_gap_quarantined_customers': len(gap_quarantine),
+         'adjacent_pairs': adjacent,
+diff --git a/isd/pipeline.py b/isd/pipeline.py
+index 1fb7a38..e5f6eea 100644
+--- a/isd/pipeline.py
++++ b/isd/pipeline.py
+@@ -163,3 +163,5 @@ def population(df, cfg):
+     eligible_customers = (
+-        list(classes) if cfg.sample_scope == 'universe' else full_coverage_customers
++        list(classes) if cfg.sample_scope == 'universe' else
++        [c for c, (kind, _) in classes.items() if kind in ('full', 'partial')]
++        if cfg.coverage_policy == 'observed_support_isd_v1' else full_coverage_customers
+     )
+@@ -212,3 +214,5 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
+             customer_id for customer_id, (coverage_class, _) in classes.items()
+-            if coverage_class == 'full'
++            if coverage_class == 'full' or (
++                cfg.coverage_policy == 'observed_support_isd_v1' and coverage_class == 'partial'
++            )
+         }
+@@ -222,2 +226,4 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
+         'modeled_bills': len(modeled),
++        'coverage_policy': cfg.coverage_policy,
++        'partial_coverage_modeled_customers': sum(classes[c][0] == 'partial' for c in cohort_ids),
+         'fallback_reason': None,
+@@ -236,3 +242,4 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
+         fit_mask &= (
+-            (covered_customers == len(cohort_ids))
++            ((covered_customers > 0) if cfg.coverage_policy == 'observed_support_isd_v1'
++             else (covered_customers == len(cohort_ids)))
+             & (daily.weather_status.to_numpy() == 'complete')
+@@ -437,2 +444,4 @@ def export_outputs(selected, classes, daily, origin, cfg, out, run_id, modeled,
+     gap_customers = set(selected.loc[selected.exclusion_reason == 'internal_target_gap', 'SubscriptionNumber'])
++    if 'internal_target_gap' in selected:
++        gap_customers.update(selected.loc[selected.internal_target_gap, 'SubscriptionNumber'])
+     records = iter(accepted.itertuples(index=False))

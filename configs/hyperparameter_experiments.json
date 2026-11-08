@@ -1,0 +1,895 @@
+{
+  "output_directory": "outputs/hyperparameter_experiments",
+  "bills_path": "data/prepared/bill_Customers_Town_Q_full_year.csv",
+  "weather_path": "data/prepared/open-meteo-2024-25.csv",
+  "tbs_path": "data/prepared/TBS_Town_Q_daily_consumption.csv",
+  "shared_parameters": {
+    "n_lr_models": [10],
+    "n_disagg_cycles": [3],
+    "alpha": [0.07],
+    "coverage_policy": "observed_support_isd_v1",
+    "max_customers": null,
+    "checkpoint": false,
+    "resume": false,
+    "export_customer_daily_csv": false
+  },
+  "models": [
+    {
+      "name": "town_uniform_floor_0_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p02_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p02_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p02_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p02_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p02_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p02_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p05_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p05_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p05_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p05_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p05_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p05_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p1_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p1_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p1_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p1_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p1_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p1_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p2_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p2_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p2_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p2_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p2_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p2_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p3_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p3_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p3_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p3_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p3_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_uniform_floor_0p3_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "uniform",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.0,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p02_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p02_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p02_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p02_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p02_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p02_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.02,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p05_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p05_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p05_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p05_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p05_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p05_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.05,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p1_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p1_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p1_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p1_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p1_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p1_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.1,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p2_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p2_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p2_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p2_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p2_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p2_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.2,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p3_ref_0",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.0,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p3_ref_0p02",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.02,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p3_ref_0p05",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.05,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p3_ref_0p1",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.1,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p3_ref_0p2",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.2,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    },
+    {
+      "name": "town_seasonal_reference_floor_0p3_ref_0p3",
+      "branch": "codex/seasonal-reference-combined",
+      "parameters": {
+        "feature_preset": "town_custom_v1",
+        "initialization": "seasonal_reference",
+        "redistribution_floor": 0.3,
+        "individual_reference_strength": 0.3,
+        "tbs_fourier_harmonics": 3,
+        "tbs_fourier_period_days": 365.2425
+      }
+    }
+  ],
+  "metric_windows": {
+    "winter": ["2024-11-15", "2025-03-15"],
+    "total_simulation": null
+  },
+  "excluded_metric_dates": ["2025-04-29", "2025-04-30"],
+  "truth_scales": [1.0, 0.8, 0.75],
+  "customers": [
+    "15013341402", "15019670989", "15042090800", "15039202856",
+    "15007491258", "15034070882", "15028359227", "15039958791",
+    "15030567227", "15008759320", "15038432763", "15018270530"
+  ],
+  "random_customer_count": 5,
+  "random_seed": null
+}

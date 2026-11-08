@@ -161,7 +161,9 @@ def population(df, cfg):
         if coverage_class == 'full'
     ]
     eligible_customers = (
-        list(classes) if cfg.sample_scope == 'universe' else full_coverage_customers
+        list(classes) if cfg.sample_scope == 'universe' else
+        [c for c, (kind, _) in classes.items() if kind in ('full', 'partial')]
+        if cfg.coverage_policy == 'observed_support_isd_v1' else full_coverage_customers
     )
     selected_ids = hash_sample(eligible_customers, cfg.max_customers, cfg.sample_seed)
     selected = canonical(df[df.SubscriptionNumber.isin(selected_ids)].copy())
@@ -210,7 +212,9 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
     else:
         cohort_ids = {
             customer_id for customer_id, (coverage_class, _) in classes.items()
-            if coverage_class == 'full'
+            if coverage_class == 'full' or (
+                cfg.coverage_policy == 'observed_support_isd_v1' and coverage_class == 'partial'
+            )
         }
         modeled = accepted[accepted.SubscriptionNumber.isin(cohort_ids)].reset_index(drop=True)
         fit_mask = (
@@ -220,6 +224,8 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
     diagnostics = {
         'modeled_customers': len(cohort_ids),
         'modeled_bills': len(modeled),
+        'coverage_policy': cfg.coverage_policy,
+        'partial_coverage_modeled_customers': sum(classes[c][0] == 'partial' for c in cohort_ids),
         'fallback_reason': None,
     }
     result = None
@@ -234,7 +240,8 @@ def allocate_model(accepted, classes, daily, origin, cfg, out):
         exposure = np.ones(n_days)
     else:
         fit_mask &= (
-            (covered_customers == len(cohort_ids))
+            ((covered_customers > 0) if cfg.coverage_policy == 'observed_support_isd_v1'
+             else (covered_customers == len(cohort_ids)))
             & (daily.weather_status.to_numpy() == 'complete')
         )
     if len(modeled):
@@ -435,6 +442,8 @@ def export_outputs(selected, classes, daily, origin, cfg, out, run_id, modeled, 
     quarantined_customers = set(selected.loc[selected.record_status.isin(['rejected_invalid', 'quarantined_customer']), 'SubscriptionNumber'])
     window_customers = set(selected.loc[selected.record_status == 'excluded_window', 'SubscriptionNumber'])
     gap_customers = set(selected.loc[selected.exclusion_reason == 'internal_target_gap', 'SubscriptionNumber'])
+    if 'internal_target_gap' in selected:
+        gap_customers.update(selected.loc[selected.internal_target_gap, 'SubscriptionNumber'])
     records = iter(accepted.itertuples(index=False))
     current = next(records, None)
     target_dates = [EPOCH.date() + timedelta(days=int(day_index)) for day_index in range(target_start, target_end_exclusive)]

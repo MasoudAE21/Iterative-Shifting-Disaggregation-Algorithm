@@ -153,7 +153,11 @@ def audit_normalized(df, deduplicate_confirmed=False, *, cfg=None):
     invalid_customers = set(
         audited.loc[audited.record_status == 'rejected_invalid', 'SubscriptionNumber'].dropna()
     )
-    quarantine = conflict_customers | duplicate_customers | invalid_customers | target_gap_customers
+    gap_quarantine = (set() if config.coverage_policy == 'observed_support_isd_v1'
+                      else target_gap_customers)
+    quarantine = conflict_customers | duplicate_customers | invalid_customers | gap_quarantine
+    if config.coverage_policy == 'observed_support_isd_v1':
+        audited['internal_target_gap'] = audited.SubscriptionNumber.isin(target_gap_customers)
     # Preserve existing rejection statuses; quarantine the remaining accepted history.
     quarantine_mask = audited.SubscriptionNumber.isin(quarantine) & (audited.record_status == 'accepted')
     audited.loc[quarantine_mask, 'record_status'] = 'quarantined_customer'
@@ -176,6 +180,7 @@ def audit_normalized(df, deduplicate_confirmed=False, *, cfg=None):
         'same_customer_overlap_pairs': overlap_pairs,
         'internal_gap_days_before_quarantine': gap_days,
         'internal_target_gap_customers': len(target_gap_customers),
+        'internal_target_gap_quarantined_customers': len(gap_quarantine),
         'adjacent_pairs': adjacent,
         'zero_bill_rows': int((audited.Consumption == 0).sum()),
         'negative_rows': int((audited.Consumption < 0).sum()),

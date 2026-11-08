@@ -132,10 +132,12 @@ class Config:
                 raise ValueError('Positive integer counts required')
         if (
             self.ordering_version != 'customer_start_end_bill_id_v1'
-            or self.coverage_policy != 'balanced_cohort_uniform_elsewhere_v1'
+            or self.coverage_policy not in ('balanced_cohort_uniform_elsewhere_v1', 'observed_support_isd_v1')
             or self.residual_tolerance_policy != '64eps_length_max_scale_v1'
         ):
             raise ValueError('Unregistered policy requires a separate adaptation')
+        if self.coverage_policy == 'observed_support_isd_v1' and not self.exposure_scaled:
+            raise ValueError('Observed-support modeling requires exposure scaling')
         if self.regression_rcond is not None and not 0 <= self.regression_rcond < 1:
             raise ValueError('Invalid rcond')
         if self.endpoint_convention != 'inclusive':

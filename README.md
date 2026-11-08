@@ -213,6 +213,52 @@ Inspect each run's `run_manifest.json`, `iteration_summary.csv`, and `simulation
 
 The checked full inputs give 579 excluded boundary bills, 16,593 weighted boundary bills, 8,423 full-period customers, and a minimum of 8,615 active bills after filtering. TBS is missing for December 2023 (31 days) and is zero on April 30, 2025. Missing TBS days stay missing; the current error summary includes the recorded zero. Report or separately assess that zero when comparing experiments. Earlier target-specific examples/counts in this README describe historical configurations.
 
+## Two-branch hyperparameter experiments
+
+Run both experimental methods with one editable config:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/run_hyperparameter_experiments.py --config configs/hyperparameter_experiments.json
+```
+
+The initial config uses the full customer population, 5 LR models, 5 disaggregation cycles per model, and alpha=0.05. Change `shared_parameters` for both methods, or `models[].parameters` for one method; model parameters override shared values. Other Config fields can also be added to those dictionaries. To compare several setups in one invocation, add model entries with distinct names and parameters; multiple entries may use the same branch. Each model inherits its branch's `run_pipeline.CONFIG`, and its complete effective configuration is saved as `resolved_config.json`. `tbs_fourier_harmonics` is the Fourier order p (initially 5 on the Fourier branch); it is inactive for the seasonal method. The annual period is `tbs_fourier_period_days`. The other exposed defaults are a 0.10 redistribution floor, 0.03 reference strength, and 1.0 Fourier customer ridge penalty.
+
+The three shared parameters `n_lr_models`, `n_disagg_cycles`, and `alpha` accept either a scalar or a nonempty list. Lists run every combination (Cartesian product) for each model entry. For example, inside `shared_parameters`:
+
+```json
+"n_lr_models": [5, 10],
+"n_disagg_cycles": [5, 10],
+"alpha": [0.01, 0.05]
+```
+
+This creates 8 combinations per branch, or 16 model runs for the two configured branches. The supplied config uses `[5]`, `[5]`, and `[0.05]`, preserving the original two-run workload. Other shared hyperparameters and all model-specific parameters still require scalars. Model-specific scalars override the shared grid for that model; duplicate choices are removed. Counts must be positive integers, and alpha must be finite and between 0 and 1.
+
+Preview the expanded runs without starting simulations or creating output folders:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/run_hyperparameter_experiments.py --config configs/hyperparameter_experiments.json --dry-run
+```
+
+Multi-combination runs use distinct folders such as `seasonal_reference_combined__g001`. `experiment_plan.json` maps each run name to its exact scalar parameters, and the combined `metrics.csv` includes those values for comparison. Single-value setups keep their existing model folder names. All combinations in a batch use the same selected customer sample.
+
+Each invocation creates a new timestamped folder in `outputs/hyperparameter_experiments`, preserving previous trials. It reads committed snapshots of the configured local branches without switching branches; arbitrary uncommitted scientific-code edits are excluded. For `coverage_policy: "observed_support_isd_v1"`, it applies the common fix in `patches/observed_support_isd.patch` to older snapshots of both branches. The exact patch and its SHA256 are saved alongside the base commit; modified scientific source is included in the run's source fingerprint. Branch names can also be pinned to commit hashes. Snapshots, commit IDs, the runner, input hashes, full effective configs, terminal logs, and customer random seed are retained. The working checkout only needs this runner, its config, and the policy patch; it does not need to be switched between methods.
+
+The experiment config now uses `observed_support_isd_v1`: partial customers enter ISD on their accepted bill periods, and internal or edge gaps remain unavailable. Daily exposure uses the number of supported modeled customers on each day divided by the modeled population; regression fits complete-weather days with nonzero exposure. This changes the fitting population and assumes comparable average response across changing customer support, so scores should be compared separately from the older balanced-cohort runs. Conflicting/overlapping, duplicate, or invalid histories remain quarantined. The original `balanced_cohort_uniform_elsewhere_v1` policy is still available and remains the library default.
+
+Every new experiment independently verifies that each saved allocation belongs to the bill's customer, lies inside both the effective and original source bill dates, appears exactly once per bill-day, and conserves its effective bill total. Window clipping/proration follows the existing configured boundary policy; it never assigns a bill's consumption to dates outside that bill.
+
+`metrics.csv` compares MAPE (%), RMSE (m3/day), R2, and Pearson correlation (`pearson_r`) for November 15, 2024 through March 15, 2025 inclusive, and the entire configured simulation. Each window has separate scores against measured TBS and 0.75 times TBS, controlled by `truth_scales: [1.0, 0.75]`; predictions stay unchanged. Rows identify their `truth_scale` and `truth_reference`. April 29 and 30, 2025 are excluded from metrics only. Missing measurements/predictions are omitted as pairs and counted; measured zeros are excluded from MAPE only. Constant/insufficient TBS yields an undefined R2; Pearson is undefined if either paired series is constant or fewer than two pairs exist. Positive scaling of TBS leaves Pearson unchanged. `metric_daily_pairs.csv` exposes the dates, truth series, and inclusion flags. Fourier uses TBS as an input, so its scores are in-sample reconstruction diagnostics; truth scaling affects evaluation only.
+
+The 12 fixed customers plus 5 randomly chosen additional customers are shared across methods in a trial. A null `random_seed` selects a new sample per invocation; set an integer to repeat it. `customer_selection.json` records the actual seed and IDs. `customer_daily_estimates.csv` contains their complete daily grids, keeping unavailable consumption blank. Its `uniform_consumption_m3` column uses each accepted effective bill's total divided by its bill days, including the run's boundary adjustments. `customer_profiles_comparison.png` overlays both methods and a grey uniform bill-allocation baseline; each model also has its own profile plot and CSV with that baseline. `aggregate_tbs_comparison.png` shows both truth scales. `report.md` summarizes the experiment. Full bill conservation, finite/nonnegative allocations, reserve-floor compliance, matching effective ledgers, and completion of the requested cycles are checked for new simulations before `completion.json` is written.
+
+To update only the reports for an existing completed batch, preserving its saved allocations and random customer selection:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/run_hyperparameter_experiments.py --reports-only outputs/hyperparameter_experiments/20261108T082633Z_65845009
+```
+
+This reads the batch's saved `experiment_config.json` and reuses its previous allocation audit without repeating model fitting.
+
 ## Data organization
 
 - `data/raw/`: original database exports, original customer workbook, historical regional bills, and `TBS_Town_Q_daily_raw.tab`.
