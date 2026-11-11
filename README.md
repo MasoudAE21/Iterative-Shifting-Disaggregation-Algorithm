@@ -280,3 +280,40 @@ Generate a daily uniform allocation from **every row** in the corrected full-yea
 ```
 
 This writes `outputs/town_uniform/full_year_daily_uniform.csv`, with `date`, `number_of_bills` (active bill rows), `number_of_customers` (distinct customers with active bills), and `uniform_consumption` (m3/day). Each bill contributes `Consumption / (ToDate - FromDate + 1)` on every inclusive bill date. No weather, duration, target-window, or population filtering is applied. Overlapping/duplicate rows count independently toward bill count and consumption; customers count once per day. Zero-support dates between the first and last bill dates are retained. ISO and explicit M/D/YYYY source dates are supported. Use `--bills PATH --output PATH` for other files.
+
+### Customer summer floors
+
+The Town entry point (`run_pipeline.py`) and `configs/seasonal_reference_combined.json` enable customer summer floors. Settings can be overridden in the run JSON:
+
+```json
+{
+  "customer_summer_floor": true,
+  "summer_floor_fraction": 0.95,
+  "summer_min_covered_days": 30,
+  "summer_fallback_fraction": 0.10,
+  "divide_consumption_by_unit_count": false
+}
+```
+
+Summer is June 1 through September 30, inclusive, in the Gregorian calendar. For accepted, effective bills after date-window adjustments, the baseline is `sum(summer_overlap_days * Consumption / day_count) / sum(summer_overlap_days)`. Available summers are pooled. Audited customer histories do not overlap; missing days are excluded and recorded zero bills count as covered days. Bills crossing a summer boundary contribute only their summer overlap, using their full effective bill's uniform daily consumption.
+
+With at least `summer_min_covered_days`, the requested daily floor is `summer_floor_fraction * customer_baseline`. Otherwise it is `summer_fallback_fraction * bill_daily_average`. Each bill's effective floor is capped at its own daily average, preserving bill totals and zero bills. The solver reserves this floor on every supported day and distributes the remaining bill volume using residual weights. Seasonal initialization and reference correction use the same floor. A bill clipped to its average becomes uniform. Uniform allocation fallbacks also satisfy these floors. Disable `customer_summer_floor` to use the legacy `redistribution_floor`; the low-level `Config()` retains this disabled default for reference-method compatibility.
+
+`normalized_bills.parquet` records `summer_covered_days`, `summer_daily_baseline`, `daily_floor`, `floor_source`, and `floor_feasibility_adjusted`. `aggregate_daily_summary.csv` and `simulation_daily_comparison.csv` include `total_floor_consumption_m3`, the sum of feasible bill floors on each date across accepted, selected customer support, including uniform fallback bills. Unsupported dates outside the exported aggregate domain remain missing in the comparison file.
+
+When `divide_consumption_by_unit_count` is true, accepted bill consumption is divided by that bill's positive integer `UnitCount` before date-window adjustments, baseline calculation, solving, and export. Raw source fields and `consumption_before_unit_normalization` preserve the original values. Invalid unit counts stop the run. Reconciliation then conserves normalized effective bill totals. Export column names are retained for compatibility, but modeled totals are sums of per-unit consumption, not physical town consumption. The run manifest records this basis, and station bias/MAE/RMSE are omitted because physical TBS totals are not directly comparable. Capacity constraints are not applied.
+
+### Grid search with the customer summer floor
+
+Run the six-combination full-town grid from the `codex/customer-floor-vs-share-cap` checkout:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/run_hyperparameter_experiments.py --config configs/summer_floor_grid.json --dry-run
+.\.venv\Scripts\python.exe scripts/run_hyperparameter_experiments.py --config configs/summer_floor_grid.json
+```
+
+This holds the summer fraction at 0.95, minimum coverage at 30 days, fallback at 0.10, and UnitCount normalization off. It varies alpha over `[0.00001, 0.00002]` and reference strength over `[0.1, 0.2, 0.3]`, with 10 LR models and 3 sweeps per model. Edit the shared grid lists or model scalar settings in `configs/summer_floor_grid.json` for other combinations.
+
+The config explicitly selects `source: "working_tree"`. The runner freezes the current checkout's source, including uncommitted changes and new files, once at batch start; every working-tree model receives that same copy. The configured branch must be checked out. `working_source/working_tree_snapshot.json` records the base commit and per-file SHA256 hashes, and each run retains a copy. Existing configs continue using committed branch snapshots by default.
+
+Each invocation writes a fresh timestamped batch under `outputs/summer_floor_grid`, with the same customer profile PNGs/CSVs, aggregate TBS comparison, metrics CSV/JSON, report, validation, and completion files as previous grid runs. The same 12 fixed plus 5 random customers are used across all six combinations. Winter/full-simulation windows, date exclusions, and TBS truth scales are copied from the prior experiment config. Every simulation comparison also retains the new total-floor column.

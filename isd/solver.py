@@ -36,6 +36,7 @@ class State:
     offsets: np.ndarray
     n_days: int
     identity_token: str = ""
+    daily_floors: np.ndarray | None = None
 
     def validate(self):
         if not (
@@ -53,6 +54,12 @@ class State:
             raise ValueError('Invalid total')
         if not np.array_equal(np.diff(self.offsets), self.lengths) or self.offsets[0] != 0:
             raise ValueError('Offsets')
+        if self.daily_floors is not None:
+            if (self.daily_floors.shape != self.totals.shape or
+                    not np.isfinite(self.daily_floors).all() or
+                    np.any(self.daily_floors < 0) or
+                    np.any(self.daily_floors > self.totals / self.lengths)):
+                raise ValueError('Invalid daily floors')
         return self
 
 @dataclass
@@ -112,7 +119,7 @@ def correct_roundoff(a, total, cfg):
         raise ArithmeticError('Invalid corrected allocation')
     return a
 
-def interval_update(old, y, p, total, cfg, reference=None):
+def interval_update(old, y, p, total, cfg, reference=None, daily_floor=None):
     """Hand-checkable Eq. 20-23 update, returning new, restored y, no-op flag."""
     other_contributions = y - old
     subtraction_tolerance = 64 * EPS * np.maximum(1, np.maximum(np.abs(y), np.abs(old)))
@@ -135,8 +142,8 @@ def interval_update(old, y, p, total, cfg, reference=None):
         else:
             weights = residual / np.max(residual)
             proposed_allocation = total * (weights / sum_compensated.py_func(weights))
-            proposed_allocation = ((1 - cfg.redistribution_floor) * proposed_allocation
-                                  + cfg.redistribution_floor * total / len(old))
+            floor = cfg.redistribution_floor * total / len(old) if daily_floor is None else daily_floor
+            proposed_allocation = floor + max(0.0, total - floor * len(old)) * (weights / sum_compensated.py_func(weights))
             new_allocation = correct_roundoff(
                 (1 - cfg.alpha) * old + cfg.alpha * proposed_allocation,
                 total,
@@ -164,6 +171,7 @@ def reference_sweep(a, y, p, state, cfg, reference=None):
             state.totals[bill_index],
             cfg,
             reference[offset:offset + length] if reference is not None else None,
+            state.daily_floors[bill_index] if state.daily_floors is not None else None,
         )
         a[offset:offset + length] = new_allocation
         y[day_start:day_start + length] = restored_aggregate
@@ -172,7 +180,7 @@ def reference_sweep(a, y, p, state, cfg, reference=None):
 
 @njit(cache=True, fastmath=False)
 def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol,
-                 redistribution_floor=0.0, reference=None, strength=0.0):
+                 redistribution_floor=0.0, reference=None, strength=0.0, daily_floors=None):
     """Compiled sequential sweep matching the reference arithmetic order."""
     noops = 0
     for bill_index in range(len(starts)):
@@ -215,7 +223,8 @@ def scaled_sweep(a, y, p, starts, lengths, totals, offsets, alpha, atol, rtol,
             weight_sum = sum_compensated(residual)
             for day_offset in range(length):
                 proposed_allocation = total * (residual[day_offset] / weight_sum)
-                proposed_allocation = (1 - redistribution_floor) * proposed_allocation + redistribution_floor * total / length
+                floor = redistribution_floor * total / length if daily_floors is None else daily_floors[bill_index]
+                proposed_allocation = floor + max(0.0, total - floor * length) * (residual[day_offset] / weight_sum)
                 a[offset + day_offset] = (1 - alpha) * a[offset + day_offset] + alpha * proposed_allocation
         if strength:
             if reference is None:
@@ -262,9 +271,9 @@ def seasonal_reference(state, weights, cfg):
     for k, total in enumerate(state.totals):
         w = weights[state.starts[k]:state.starts[k] + state.lengths[k]]
         w = w / w.max()
-        shape = ((1 - cfg.redistribution_floor) * w / sum_compensated.py_func(w)
-                 + cfg.redistribution_floor / state.lengths[k])
-        reference[state.offsets[k]:state.offsets[k+1]] = correct_roundoff(total * shape, total, cfg)
+        floor = cfg.redistribution_floor * total / state.lengths[k] if state.daily_floors is None else state.daily_floors[k]
+        values = floor + max(0.0, total - floor * state.lengths[k]) * w / sum_compensated.py_func(w)
+        reference[state.offsets[k]:state.offsets[k+1]] = correct_roundoff(values, total, cfg)
     return reference
 
 
@@ -337,6 +346,8 @@ def state_lock(state, X, mask, cfg, reference_weights=None):
     digest.update(state.identity_token.encode())
     for array in [state.starts, state.lengths, state.totals, state.offsets, X, mask]:
         digest.update(np.ascontiguousarray(array).tobytes())
+    if state.daily_floors is not None:
+        digest.update(np.ascontiguousarray(state.daily_floors).tobytes())
     settings = cfg.as_dict()
     settings.pop('resume')
     settings.pop('checkpoint')
@@ -357,6 +368,8 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
     started_at = time.perf_counter()
     cfg.validate()
     state.validate()
+    if cfg.customer_summer_floor and state.daily_floors is None:
+        raise ValueError('Customer summer floor requires prepared daily floors')
     X = np.asarray(X, dtype=np.float64)
     if X.ndim != 2 or X.shape[0] != state.n_days or (not np.isfinite(X).all()):
         raise ValueError('Invalid design')
@@ -450,7 +463,7 @@ def solve(state, X, cfg, fit_mask=None, checkpoint_path=None, storage=None, stop
                     cfg.alpha,
                     cfg.reconciliation_atol,
                     cfg.reconciliation_rtol,
-                    cfg.redistribution_floor, reference, cfg.individual_reference_strength,
+                    cfg.redistribution_floor, reference, cfg.individual_reference_strength, state.daily_floors,
                 )
             total_noops += cycle_noops
             outer_noops += cycle_noops

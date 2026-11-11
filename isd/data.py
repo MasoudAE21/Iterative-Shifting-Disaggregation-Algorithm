@@ -289,7 +289,8 @@ def prepare_state(
     totals = bills.Consumption.to_numpy(dtype=np.float64)
     ordered_bill_ids = "|".join(bills.bill_id.astype(str))
     identity_token = hashlib.sha256(ordered_bill_ids.encode()).hexdigest()
-    state = State(starts, lengths, totals, offsets, n_days, identity_token).validate()
+    floors = bills.daily_floor.to_numpy(dtype=np.float64) if 'daily_floor' in bills else None
+    state = State(starts, lengths, totals, offsets, n_days, identity_token, floors).validate()
 
     if verbose:
         import json

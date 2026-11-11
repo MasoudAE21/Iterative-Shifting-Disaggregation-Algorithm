@@ -76,7 +76,7 @@ def test_resume_boundaries(engine,stop,tmp_path):
 def test_pipeline_checkpoint_failures_no_success(tmp_path,failure):
     from isd.pipeline import run
     from test_pipeline import test_pipeline_full_intervals_missing_zeros_and_chunked_exports
-    test_pipeline_full_intervals_missing_zeros_and_chunked_exports(tmp_path)
+    test_pipeline_full_intervals_missing_zeros_and_chunked_exports(tmp_path, False)
     out=tmp_path/'failed';out.mkdir()
     for name in ['run_manifest.json','target_customer_daily.parquet','customer_peak_consumption.csv']:
         (out/name).write_text('stale previous success')

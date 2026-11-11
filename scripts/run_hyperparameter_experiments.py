@@ -208,6 +208,10 @@ def validate_allocations(folder):
             raise ValueError('Duplicate bill-day allocation')
         seen[slots] = True
         sums += np.bincount(indices, weights=values, minlength=len(bills))
+        floors = (bills.daily_floor.to_numpy(dtype=float)[indices] if 'daily_floor' in bills
+                  else cfg['redistribution_floor'] * means[indices])
+        if np.any(values < floors - cfg['reconciliation_atol'] - cfg['reconciliation_rtol'] * totals[indices]):
+            raise ValueError('Daily floor violated')
         positive = means[indices] > 0
         if positive.any():
             minimum_ratio = min(minimum_ratio, float(np.min(values[positive] / means[indices[positive]])))
@@ -216,8 +220,6 @@ def validate_allocations(folder):
     error = np.abs(sums - totals)
     if not (error <= cfg['reconciliation_atol'] + cfg['reconciliation_rtol'] * totals).all():
         raise ValueError('Saved allocations do not conserve bill totals')
-    if minimum_ratio < cfg['redistribution_floor'] - 1e-10:
-        raise ValueError('Redistribution floor violated')
     return dict(ledger_sha256=digest, bills=len(bills), max_bill_error=float(error.max()),
                 checked_bill_days=int(seen.size), outside_bill_days=0, duplicate_bill_days=0, missing_bill_days=0,
                 minimum_daily_bill_mean_ratio=minimum_ratio if np.isfinite(minimum_ratio) else None,
@@ -334,6 +336,36 @@ def snapshot_branch(branch, destination, coverage_policy=None):
     return commit
 
 
+def snapshot_working_tree(branch, destination):
+    """Freeze current source, including uncommitted files, with content hashes."""
+    current = subprocess.check_output(['git', 'branch', '--show-current'], cwd=ROOT, text=True).strip()
+    if branch != current:
+        raise ValueError(f'working_tree source requires current branch {branch}; current branch is {current}')
+    commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    paths = subprocess.check_output([
+        'git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard', '--',
+        'isd', 'configs', 'run_pipeline.py', 'README.md', 'requirements.txt', 'tests', 'scripts', 'handoff',
+    ], cwd=ROOT).decode('utf-8').split('\0')
+    hashes = {}
+    for relative in sorted(set(filter(None, paths))):
+        source = ROOT / relative
+        if not source.is_file():  # A locally deleted tracked file stays deleted.
+            continue
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        content = source.read_bytes()
+        target.write_bytes(content)
+        hashes[relative] = hashlib.sha256(content).hexdigest()
+    roster = ROOT / 'data/prepared/Customers_Town_Q.csv'
+    if roster.exists():
+        target = destination / 'data/prepared' / roster.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(roster, target)
+    write_json(destination / 'working_tree_snapshot.json', dict(
+        source='working_tree', branch=branch, base_commit=commit, files=hashes))
+    return commit
+
+
 def export_model_reports(folder, model, settings, selected):
     name = model['name']
     manifest = json.loads((folder / 'run_manifest.json').read_text(encoding='utf-8'))
@@ -384,6 +416,19 @@ def run_experiments(config_path):
     shutil.copy2(Path(__file__), batch / 'runner.py')
     seed = settings['random_seed'] if settings['random_seed'] is not None else random.SystemRandom().randrange(2**63)
     selected, metrics, provenance, profiles, aggregates = None, [], [], {}, []
+    working_snapshot = None
+    for model in models:
+        source = model.get('source', 'branch')
+        if source not in ('branch', 'working_tree'):
+            raise ValueError(f'Unknown model source: {source}')
+        if source == 'working_tree':
+            if working_snapshot is None:
+                working_snapshot = batch / 'working_source'
+                working_snapshot.mkdir()
+                working_branch = model['branch']
+                working_commit = snapshot_working_tree(working_branch, working_snapshot)
+            elif model['branch'] != working_branch:
+                raise ValueError('All working_tree models must use the current branch')
     for run_index, model in enumerate(models, start=1):
         name = model['name']
         if not name or Path(name).name != name or name in ('.', '..'):
@@ -393,7 +438,11 @@ def run_experiments(config_path):
         snapshot.mkdir(parents=True)
         parameters = {**settings['shared_parameters'], **model['parameters'],
                       'tbs_path': str((ROOT / settings['tbs_path']).resolve())}
-        commit = snapshot_branch(model['branch'], snapshot, parameters.get('coverage_policy'))
+        if model.get('source', 'branch') == 'working_tree':
+            shutil.copytree(working_snapshot, snapshot, dirs_exist_ok=True)
+            commit = working_commit
+        else:
+            commit = snapshot_branch(model['branch'], snapshot, parameters.get('coverage_policy'))
         if parameters.get('resume'):
             raise ValueError('Each experiment starts fresh; resume must be false')
         job = dict(parameters=parameters, bills_path=str((ROOT / settings['bills_path']).resolve()),
@@ -432,6 +481,10 @@ def run_experiments(config_path):
             raise ValueError('Unexpected model fallback')
         patch_path = snapshot / 'source_patch.diff'
         provenance.append(dict(model=name, branch=model['branch'], commit=commit, validation=audit,
+                               source=model.get('source', 'branch'),
+                               working_tree_snapshot_sha256=hashlib.sha256(
+                                   (snapshot / 'working_tree_snapshot.json').read_bytes()).hexdigest()
+                               if (snapshot / 'working_tree_snapshot.json').exists() else None,
                                source_patch_sha256=hashlib.sha256(patch_path.read_bytes()).hexdigest()
                                if patch_path.exists() else None))
         aggregates.append((name, comparison.date_gregorian, comparison.final_algorithm_consumption_m3.to_numpy()))
@@ -521,6 +574,9 @@ def write_report(batch, metrics, provenance, selected):
                          f'{a["missing_bill_days"]} missing.')
         if item.get('source_patch_sha256'):
             lines.append(f'  Support-policy source patch SHA256: {item["source_patch_sha256"]}.')
+        if item.get('working_tree_snapshot_sha256'):
+            lines.append(f'  Working-checkout snapshot (includes uncommitted changes), manifest SHA256: '
+                         f'{item["working_tree_snapshot_sha256"]}. Base commit above is provenance only.')
     lines += ['', f'Selected {len(selected)} customers; selection and seed are in customer_selection.json.', '',
               '![Customer profiles](customer_profiles_comparison.png)', '',
               '![Aggregate vs TBS](aggregate_tbs_comparison.png)', '']

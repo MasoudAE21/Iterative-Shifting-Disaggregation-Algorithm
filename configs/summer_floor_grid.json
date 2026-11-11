@@ -1,0 +1,82 @@
+{
+  "output_directory": "outputs/summer_floor_grid",
+  "bills_path": "data/prepared/bill_Customers_Town_Q_full_year.csv",
+  "weather_path": "data/prepared/open-meteo-2024-25.csv",
+  "tbs_path": "data/prepared/TBS_Town_Q_daily_consumption.csv",
+  "shared_parameters": {
+    "n_lr_models": [
+      10, 20, 5
+    ],
+    "n_disagg_cycles": [
+      3, 5, 10
+    ],
+    "alpha": [
+      1E-05,
+      1E-04
+    ],
+    "coverage_policy": "observed_support_isd_v1",
+    "max_customers": null,
+    "checkpoint": false,
+    "resume": false,
+    "export_customer_daily_csv": false,
+    "customer_summer_floor": true,
+    "summer_floor_fraction": 0.95,
+    "summer_min_covered_days": 10,
+    "summer_fallback_fraction": 0.1,
+    "divide_consumption_by_unit_count": false
+  },
+  "models": [
+    {
+      "parameters": {
+        "individual_reference_strength": 0.0,
+        "initialization": "uniform",
+        "feature_preset": "town_custom_v1"
+      },
+      "name": "town_summer95_ref_0p0",
+      "source": "working_tree",
+      "branch": "codex/customer-floor-vs-share-cap"
+    },
+    {
+      "parameters": {
+        "individual_reference_strength": 0.1,
+        "initialization": "uniform",
+        "feature_preset": "town_custom_v1"
+      },
+      "name": "town_summer95_ref_0p1",
+      "source": "working_tree",
+      "branch": "codex/customer-floor-vs-share-cap"
+    }
+  ],
+  "metric_windows": {
+    "winter": [
+      "2024-11-15",
+      "2025-03-15"
+    ],
+    "total_simulation": null
+  },
+  "excluded_metric_dates": [
+    "2025-04-29",
+    "2025-04-30"
+  ],
+  "truth_scales": [
+    1.0,
+    0.8,
+    0.75
+  ],
+  "customers": [
+    "15013341402",
+    "15019670989",
+    "15042090800",
+    "15039202856",
+    "15007491258",
+    "15034070882",
+    "15028359227",
+    "15039958791",
+    "15030567227",
+    "15008759320",
+    "15038432763",
+    "15018270530"
+  ],
+  "random_customer_count": 5,
+  "random_seed": null
+}

@@ -22,7 +22,8 @@ def test_full_simulation_export(tmp_path):
                   'consumption_m3': [10, 30]}).to_csv(station, index=False)
     dates = pd.date_range('2024-11-01', '2025-03-31')
     pd.DataFrame({'date_gregorian': dates, 'uniform_baseline_sum': 15,
-                  'combined_observed_support_sum': 20, 'coverage_fraction': .75}).to_csv(tmp_path / 'aggregate_daily_summary.csv', index=False)
+                  'combined_observed_support_sum': 20, 'coverage_fraction': .75,
+                  'total_floor_consumption_m3': 7}).to_csv(tmp_path / 'aggregate_daily_summary.csv', index=False)
     compare_tbs(station, tmp_path, Config())
     result = pd.read_csv(tmp_path / 'simulation_daily_comparison.csv')
     assert len(result) == 151
@@ -32,6 +33,10 @@ def test_full_simulation_export(tmp_path):
     assert result.final_algorithm_consumption_m3.sum() == 151 * 20
     assert result.tbs_daily_m3.isna().sum() == 149
     assert result.included_customer_fraction.eq(.75).all()
+    assert result.total_floor_consumption_m3.eq(7).all()
+    metadata = compare_tbs(station, tmp_path, Config(divide_consumption_by_unit_count=True))
+    assert metadata['station_metrics_comparable'] is False
+    assert metadata['rmse_m3'] is None
 
 
 def test_customer_fraction_uses_roster_including_customers_without_bills(tmp_path):

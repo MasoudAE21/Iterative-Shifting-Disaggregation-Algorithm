@@ -10,6 +10,50 @@ from scripts.run_hyperparameter_experiments import metric_reports, metric_scores
 from scripts.run_hyperparameter_experiments import expand_model_grid, main
 
 
+def test_summer_grid_uses_new_implementation_and_preserves_report_settings():
+    from scripts.run_hyperparameter_experiments import ROOT
+    settings = json.loads((ROOT / 'configs/summer_floor_grid.json').read_text(encoding='utf-8-sig'))
+    runs = expand_model_grid(settings)
+    assert len(runs) == 6
+    for model in runs:
+        assert model['source'] == 'working_tree'
+        p = model['parameters']
+        assert p['customer_summer_floor'] is True
+        assert p['summer_floor_fraction'] == .95
+        assert p['summer_min_covered_days'] == 30
+        assert p['summer_fallback_fraction'] == .1
+        assert p['divide_consumption_by_unit_count'] is False
+        assert p['max_customers'] is None
+    assert len(settings['customers']) == 12
+    assert settings['random_customer_count'] == 5
+
+
+def test_working_snapshot_freezes_uncommitted_and_new_source(tmp_path, monkeypatch):
+    import hashlib
+    import scripts.run_hyperparameter_experiments as runner
+    root = tmp_path / 'repo'
+    (root / 'isd').mkdir(parents=True)
+    (root / 'isd/config.py').write_text('changed settings')
+    (root / 'isd/customer_floor.py').write_text('new floor implementation')
+    monkeypatch.setattr(runner, 'ROOT', root)
+    def git(args, **kwargs):
+        if args[1] == 'branch':
+            return 'codex/test\n'
+        if args[1] == 'rev-parse':
+            return 'basecommit\n'
+        return b'isd/config.py\0isd/customer_floor.py\0isd/deleted.py\0'
+    monkeypatch.setattr(runner.subprocess, 'check_output', git)
+    destination = tmp_path / 'snapshot'
+    assert runner.snapshot_working_tree('codex/test', destination) == 'basecommit'
+    manifest = json.loads((destination / 'working_tree_snapshot.json').read_text())
+    assert manifest['files']['isd/customer_floor.py'] == hashlib.sha256(b'new floor implementation').hexdigest()
+    (root / 'isd/customer_floor.py').write_text('later edit')
+    assert (destination / 'isd/customer_floor.py').read_text() == 'new floor implementation'
+    assert not (destination / 'isd/deleted.py').exists()
+    with pytest.raises(ValueError, match='current branch'):
+        runner.snapshot_working_tree('other', destination)
+
+
 def test_scores_use_tbs_as_reference_and_report_missing_and_zero_days():
     frame = pd.DataFrame({'tbs_daily_m3': [1., 2., 0., np.nan, 4.],
                           'final_algorithm_consumption_m3': [2., 2., 1., 10., np.nan]})

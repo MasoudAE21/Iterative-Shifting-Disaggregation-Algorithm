@@ -316,6 +316,7 @@ def export_outputs(selected, classes, daily, origin, cfg, out, run_id, modeled, 
     ]
     combined_sum = np.zeros(n_days)
     uniform_sum = np.zeros(n_days)
+    floor_sum = np.zeros(n_days)
     weighted_sum = np.zeros(n_days)
     fallback_sum = np.zeros(n_days)
     model_sum = np.zeros(n_days)
@@ -385,6 +386,10 @@ def export_outputs(selected, classes, daily, origin, cfg, out, run_id, modeled, 
             weighted = np.full(length, np.nan)
         combined_sum[day_index:day_index + length] += allocations
         uniform_sum[day_index:day_index + length] += uniform
+        floor = float(getattr(r, "daily_floor", cfg.redistribution_floor * total / length))
+        if np.any(allocations < floor - cfg.reconciliation_atol - cfg.reconciliation_rtol * abs(total)):
+            raise ArithmeticError("Daily floor violation")
+        floor_sum[day_index:day_index + length] += floor
         weighted_sum[day_index:day_index + length] += weighted
         covered_customers[day_index:day_index + length] += 1
         if total == 0:
@@ -512,6 +517,7 @@ def export_outputs(selected, classes, daily, origin, cfg, out, run_id, modeled, 
         'observed_partial_or_failed_uniform_sum': fallback_sum,
         'combined_observed_support_sum': combined_sum,
         'uniform_baseline_sum': uniform_sum,
+        'total_floor_consumption_m3': floor_sum,
         'weather_weighted_baseline_sum': weighted_sum,
         'predicted_profile_last_outer': last_prediction,
         'n_customers_covered': covered_customers,
@@ -614,6 +620,8 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
             source, audit = read_bills(bills_path, cfg)
         else:
             source, audit = preloaded
+        from .customer_floor import normalize_consumption, attach_customer_floors
+        source = normalize_consumption(source, cfg)
         stage_seconds['import_audit_seconds'] = time.perf_counter() - stage_started_at
         stage_rss['after_import'] = memory.process.memory_info().rss
         stage_started_at = time.perf_counter()
@@ -630,6 +638,7 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
         if cfg.bill_boundary_policy != 'keep':
             window = resolve_window(seconds, values, cfg)
             source, window_audit = apply_bill_window(source, cfg, *window)
+        source = attach_customer_floors(source, cfg)
         selected, classes, selection = population(source, cfg)
         stage_seconds['population_seconds'] = time.perf_counter() - stage_started_at
         accepted = selected[selected.record_status == 'accepted']
@@ -731,6 +740,8 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
         manifest = {
             'run_id': run_id,
             'configuration': cfg.as_dict(),
+            'modeled_consumption_basis': ('sum_of_bill_consumption_per_unit'
+                                          if cfg.divide_consumption_by_unit_count else 'customer_total'),
             'inputs': input_hashes,
             'audit_hash_lock_matched': schema_hash_match,
             'code': source_fingerprint(root),

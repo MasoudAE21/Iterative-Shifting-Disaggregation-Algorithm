@@ -41,7 +41,8 @@ def evaluate(folder, baseline=None):
     minimum_ratio = float(daily_ratios.min())
     reserve = manifest['configuration'].get('redistribution_floor', 0.)
     if not baseline:
-        assert minimum_ratio >= reserve - 1e-10, 'Uniform reserve violated'
+        floors = bills.daily_floor if 'daily_floor' in bills else reserve * means
+        assert (daily.estimated_consumption >= daily.bill_id.map(floors) - 1e-8).all(), 'Daily floor violated'
     agg = pd.read_parquet(folder/'aggregate_daily.parquet')
     baseline_totals = {}
     for column in ['uniform_baseline_sum', 'weather_weighted_baseline_sum']:

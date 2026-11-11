@@ -13,6 +13,8 @@ def compare_tbs(path, out, cfg, *, roster_path=None):
         raise ValueError('Infinite TBS consumption')
     # Blank measurements stay missing and are excluded from paired metrics.
     modeled = pd.read_csv(out / 'aggregate_daily_summary.csv', parse_dates=['date_gregorian'])
+    if 'total_floor_consumption_m3' not in modeled:
+        modeled['total_floor_consumption_m3'] = np.nan
     # Include supported zero-use customers and uniform fallback customers.
     # A roster denominator also accounts for customers with no source bills.
     roster_count = None
@@ -30,7 +32,7 @@ def compare_tbs(path, out, cfg, *, roster_path=None):
         cfg.target_start if cfg.bill_window == 'target' else cfg.simulation_start,
         cfg.target_end_exclusive if cfg.bill_window == 'target' else cfg.simulation_end_exclusive, inclusive='left')})
     simulation = simulation_dates.merge(
-        modeled[['date_gregorian', 'uniform_baseline_sum', 'combined_observed_support_sum', 'included_customer_fraction']],
+        modeled[['date_gregorian', 'uniform_baseline_sum', 'combined_observed_support_sum', 'included_customer_fraction', 'total_floor_consumption_m3']],
         on='date_gregorian', how='left', validate='one_to_one',
     ).merge(station, on='date_gregorian', how='left', validate='one_to_one')
     simulation = simulation.rename(columns={
@@ -39,13 +41,16 @@ def compare_tbs(path, out, cfg, *, roster_path=None):
         'combined_observed_support_sum': 'final_algorithm_consumption_m3',
     })
     simulation[['date_gregorian', 'tbs_daily_m3', 'total_uniform_consumption_m3',
-                'final_algorithm_consumption_m3', 'included_customer_fraction']].to_csv(out / 'simulation_daily_comparison.csv', index=False)
+                'final_algorithm_consumption_m3', 'included_customer_fraction', 'total_floor_consumption_m3']].to_csv(out / 'simulation_daily_comparison.csv', index=False)
     dates = pd.DataFrame({'date_gregorian': pd.date_range(cfg.target_start, cfg.target_end_exclusive, inclusive='left')})
     comparison = dates.merge(modeled, on='date_gregorian', how='left', validate='one_to_one').merge(station, on='date_gregorian', how='left', validate='one_to_one')
-    comparison['difference_m3'] = comparison.combined_observed_support_sum - comparison.consumption_m3
+    comparison['difference_m3'] = (np.nan if cfg.divide_consumption_by_unit_count else
+                                   comparison.combined_observed_support_sum - comparison.consumption_m3)
     comparison.to_csv(out / 'tbs_daily_comparison.csv', index=False)
     paired = comparison.dropna(subset=['difference_m3'])
     return {
+        'modeled_consumption_basis': 'sum_of_bill_consumption_per_unit' if cfg.divide_consumption_by_unit_count else 'customer_total',
+        'station_metrics_comparable': not cfg.divide_consumption_by_unit_count,
         'path': str(path), 'sha256': sha256(path),
         'customer_fraction_denominator': 'roster' if roster_path is not None else 'selected_run_population',
         'customer_roster_count': roster_count,

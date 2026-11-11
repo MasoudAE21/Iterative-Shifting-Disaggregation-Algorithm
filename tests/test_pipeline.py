@@ -4,11 +4,13 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import pyarrow.parquet as pq
+import pytest
 from isd.config import Config
 from isd.data import COLUMNS
 from isd.pipeline import run
 
-def test_pipeline_full_intervals_missing_zeros_and_chunked_exports(tmp_path):
+@pytest.mark.parametrize('summer_floor', [False, True])
+def test_pipeline_full_intervals_missing_zeros_and_chunked_exports(tmp_path, summer_floor):
     data=tmp_path/'data'/'prepared'; data.mkdir(parents=True)
     rows=[['00000000001','2025-01-02','2025-02-11','102','40','1','6'],['00000000001','2025-02-12','2025-04-04','260','40','1','6'],['00000000002','2025-02-01','2025-02-10','0','40','1','6'],['00000000003','2025-04-01','2025-04-02','4','40','1','6']]
     pd.DataFrame(rows,columns=COLUMNS).to_csv(data/'bill_Customers_Town_Q.csv',encoding='utf-8-sig',index=False)
@@ -16,13 +18,17 @@ def test_pipeline_full_intervals_missing_zeros_and_chunked_exports(tmp_path):
         f.write('latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n34.411247,50.490566,1435,0,GMT,GMT\n\ntime,temperature_2m (°C),apparent_temperature (°C),wind_speed_10m (km/h)\n')
         for i in range(2880):
             dt=datetime(2025,1,1)+timedelta(hours=i); f.write(f'{dt:%Y-%m-%dT%H:%M},{5+np.sin(i/40)},{3+np.sin(i/40)},10\n')
-    c=Config(n_lr_models=2,n_disagg_cycles=2,max_customers=None,checkpoint=False,row_group_size=17)
+    c=Config(n_lr_models=2,n_disagg_cycles=2,max_customers=None,checkpoint=False,row_group_size=17,
+             customer_summer_floor=summer_floor, divide_consumption_by_unit_count=summer_floor)
     m=run(tmp_path,c,tmp_path/'out'); target=pq.read_table(tmp_path/'out/target_customer_daily.parquet').to_pandas()
     assert len(target)==180 and target.date_gregorian.nunique()==60; assert m['export']['target_numeric_rows']==70; assert m['export']['target_null_rows']==110
     zero=target[(target.SubscriptionNumber=='00000000002') & (target.estimate_status=='recorded_zero')]; assert len(zero)==10 and (zero.estimated_consumption==0).all()
     outside=target[target.SubscriptionNumber=='00000000003']; assert outside.estimated_consumption.isna().all()
     reconciliation=pq.read_table(tmp_path/'out/bill_reconciliation.parquet').to_pandas(); assert reconciliation.passed.all(); np.testing.assert_allclose(reconciliation.full_daily_sum,reconciliation.target_daily_sum+reconciliation.outside_target_sum)
     full=pq.read_table(tmp_path/'out/full_bill_daily.parquet').to_pandas(); assert full.date_gregorian.min()<target.date_gregorian.min() and full.date_gregorian.max()>target.date_gregorian.max()
+    aggregate = pd.read_csv(tmp_path/'out/aggregate_daily_summary.csv')
+    np.testing.assert_allclose(aggregate.total_floor_consumption_m3,
+                               aggregate.uniform_baseline_sum * (.1 if summer_floor else 0))
     run(tmp_path,replace(c,row_group_size=1000,ingestion_chunk_size=1),tmp_path/'out2')
     other=pq.read_table(tmp_path/'out2/target_customer_daily.parquet').to_pandas(); np.testing.assert_array_equal(target.bill_id.fillna("missing"),other.bill_id.fillna("missing")); np.testing.assert_allclose(target.estimated_consumption,other.estimated_consumption,equal_nan=True)
 

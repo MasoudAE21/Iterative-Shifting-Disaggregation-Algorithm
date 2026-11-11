@@ -67,15 +67,27 @@ class Config:
     initialization: str = 'uniform'
     redistribution_floor: float = 0.0
     individual_reference_strength: float = 0.0
+    customer_summer_floor: bool = False
+    summer_floor_fraction: float = 0.95
+    summer_min_covered_days: int = 30
+    summer_fallback_fraction: float = 0.10
+    divide_consumption_by_unit_count: bool = False
 
     def validate(self):
         if self.initialization not in ('uniform', 'seasonal_reference'):
             raise ValueError('Unknown initialization')
-        for value in (self.redistribution_floor, self.individual_reference_strength):
+        for name in ('customer_summer_floor', 'divide_consumption_by_unit_count'):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f'{name} must be boolean')
+        if (isinstance(self.summer_min_covered_days, bool) or
+                not isinstance(self.summer_min_covered_days, int) or self.summer_min_covered_days < 1):
+            raise ValueError('summer_min_covered_days must be a positive integer')
+        for value in (self.redistribution_floor, self.individual_reference_strength,
+                      self.summer_floor_fraction, self.summer_fallback_fraction):
             if isinstance(value, bool) or not math.isfinite(value) or not 0 <= value <= 1:
                 raise ValueError('Reserve and correction must be finite fractions')
         if self.mode == 'paper_reference' and (self.initialization != 'uniform' or
-                self.redistribution_floor or self.individual_reference_strength):
+                self.redistribution_floor or self.individual_reference_strength or self.customer_summer_floor):
             raise ValueError('Experimental corrections require cohort mode')
         if self.feature_preset in ("tbs_fourier_v1", "town_tbs_fourier_v1"):
             if not self.tbs_path:

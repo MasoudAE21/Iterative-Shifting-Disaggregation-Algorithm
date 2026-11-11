@@ -1,11 +1,16 @@
 {
   "feature_preset": "town_custom_v1",
   "initialization": "seasonal_reference",
-  "redistribution_floor": 0.10,
+  "redistribution_floor": 0.1,
   "individual_reference_strength": 0.03,
-  "alpha": 0.05,
+  "alpha": 0.0001,
   "n_lr_models": 10,
   "n_disagg_cycles": 10,
   "checkpoint": false,
-  "export_customer_daily_csv": false
+  "export_customer_daily_csv": false,
+  "customer_summer_floor": true,
+  "summer_floor_fraction": 0.95,
+  "summer_min_covered_days": 30,
+  "summer_fallback_fraction": 0.1,
+  "divide_consumption_by_unit_count": false
 }
