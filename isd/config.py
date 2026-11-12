@@ -43,6 +43,7 @@ class Config:
     production: bool = False
     max_customers: int | None = 1000
     sample_scope: str = 'universe'
+    consumption_types: list[str] | None = None
     sample_seed: str = 'isd_pilot_v1:'
     # Select a shared population peak day or each customer's own peak day.
     peak_mode: str = 'population'
@@ -74,6 +75,12 @@ class Config:
     divide_consumption_by_unit_count: bool = False
 
     def validate(self):
+        if self.consumption_types is not None and (
+            not isinstance(self.consumption_types, list) or not self.consumption_types
+            or any(not isinstance(v, str) or not v.isdigit() for v in self.consumption_types)
+            or len(set(self.consumption_types)) != len(self.consumption_types)
+        ):
+            raise ValueError('consumption_types must be null or a nonempty list of unique numeric strings')
         if self.initialization not in ('uniform', 'seasonal_reference'):
             raise ValueError('Unknown initialization')
         for name in ('customer_summer_floor', 'divide_consumption_by_unit_count'):

@@ -223,8 +223,9 @@ def validate_allocations(folder):
     return dict(ledger_sha256=digest, bills=len(bills), max_bill_error=float(error.max()),
                 checked_bill_days=int(seen.size), outside_bill_days=0, duplicate_bill_days=0, missing_bill_days=0,
                 minimum_daily_bill_mean_ratio=minimum_ratio if np.isfinite(minimum_ratio) else None,
-                null_customer_days=pq.read_table(folder / 'target_customer_daily.parquet',
-                    columns=['estimated_consumption']).column(0).null_count,
+                null_customer_days=sum(batch.column(0).null_count for batch in
+                    pq.ParquetFile(folder / 'target_customer_daily.parquet').iter_batches(
+                        columns=['estimated_consumption'], batch_size=100000)),
                 wall_seconds=manifest['wall_seconds'],
                 fallback_reason=manifest['model_diagnostics']['fallback_reason'])
 

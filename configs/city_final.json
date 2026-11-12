@@ -1,0 +1,97 @@
+{
+  "bills_path": "data/prepared/qom_city_bills_1403.csv",
+  "weather_path": "data/prepared/open-meteo-2024-25.csv",
+  "output_directory": "outputs/final_city",
+  "simulation": {
+    "mode": "provisional_cohort_isd",
+    "engine": "scaled",
+    "alpha": 1e-05,
+    "n_lr_models": 5,
+    "n_disagg_cycles": 3,
+    "target_start": "2024-06-01",
+    "target_end_exclusive": "2025-03-16",
+    "timezone": "Asia/Tehran",
+    "feature_preset": "town_custom_v1",
+    "endpoint_convention": "inclusive",
+    "endpoint_confirmed": true,
+    "calendar_origin_confirmed": false,
+    "day_basis_confirmed": true,
+    "target_year_confirmed": true,
+    "target_jalali_year_candidate": 1403,
+    "physical_zero_confirmed": false,
+    "export_unmodified_confirmed": false,
+    "consumption_unit": "m3",
+    "provider_variable_definition": "daily_mean_apparent_temperature_and_max_wind",
+    "weather_adapter": "daily_date_labels_v1",
+    "allow_daily_timezone_mismatch": true,
+    "ordering_version": "customer_start_end_bill_id_v1",
+    "coverage_policy": "observed_support_isd_v1",
+    "zero_residual_policy": "keep_current",
+    "residual_tolerance_policy": "64eps_length_max_scale_v1",
+    "reconciliation_atol": 1e-08,
+    "reconciliation_rtol": 1e-10,
+    "regression_rcond": null,
+    "exposure_scaled": true,
+    "production": false,
+    "max_customers": null,
+    "sample_scope": "universe",
+    "sample_seed": "isd_pilot_v1:",
+    "peak_mode": "individual",
+    "export_customer_daily_csv": false,
+    "row_group_size": 100000,
+    "ingestion_chunk_size": 100000,
+    "memmap_threshold_mb": 256,
+    "checkpoint": false,
+    "resume": false,
+    "bill_boundary_policy": "monthly_weighted",
+    "bill_window": "target",
+    "simulation_start": "2024-06-01",
+    "simulation_end_exclusive": "2025-03-16",
+    "max_bill_days": 150,
+    "bill_duration_scope": "boundary",
+    "bill_date_format": "%Y-%m-%d",
+    "tbs_fourier_harmonics": 3,
+    "tbs_fourier_period_days": 365.2425,
+    "tbs_path": null,
+    "initialization": "uniform",
+    "redistribution_floor": 0.0,
+    "individual_reference_strength": 0.1,
+    "customer_summer_floor": true,
+    "summer_floor_fraction": 0.95,
+    "summer_min_covered_days": 10,
+    "summer_fallback_fraction": 0.1,
+    "divide_consumption_by_unit_count": false,
+    "consumption_types": [
+      "40"
+    ]
+  },
+  "pilot": {
+    "max_customers": 1000
+  },
+  "reports": {
+    "automatic_after_simulation": true,
+    "include_all_saved": true,
+    "windows": {
+      "winter": [
+        "2024-11-15",
+        "2025-03-16"
+      ]
+    },
+    "requested_dates": [
+      "2025-02-10",
+      "2025-02-25"
+    ],
+    "requested_date_role": "Candidate city peak dates inferred from weather and Town_Q, not measured city peaks",
+    "profile_customers": [],
+    "profile_sample_count": 10,
+    "profile_seed": 20261111,
+    "export_monthly_daily_csv": false,
+    "measured_city_daily_csv": null,
+    "truth_scales": [
+      1.0
+    ],
+    "excluded_metric_dates": [],
+    "metric_min_coverage_fraction": 1.0,
+    "minimum_peak_cohort_fraction": 0.8
+  }
+}

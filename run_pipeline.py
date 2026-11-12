@@ -23,13 +23,19 @@ CONFIG = Config(
     max_customers=None,
     customer_summer_floor=True,
     summer_floor_fraction=0.95,
-    summer_min_covered_days=30,
+    summer_min_covered_days=10,
     summer_fallback_fraction=0.10,
     divide_consumption_by_unit_count=False,
-    alpha=0.05,
-    n_lr_models=10,
-    n_disagg_cycles=10,
-    peak_mode='population',
+    alpha=1e-5,
+    n_lr_models=5,
+    n_disagg_cycles=3,
+    coverage_policy='observed_support_isd_v1',
+    initialization='uniform',
+    individual_reference_strength=0.1,
+    redistribution_floor=0.0,
+    checkpoint=False,
+    resume=False,
+    peak_mode='individual',
     export_customer_daily_csv=False,  # True writes customer_daily_csv/YYYY-MM.csv.
     bill_boundary_policy='monthly_weighted',
     bill_window='target',
@@ -40,8 +46,9 @@ CONFIG = Config(
     bill_date_format='%m/%d/%Y',
     tbs_path='data/prepared/TBS_Town_Q_daily_consumption.csv',
 )
-# Set peak_mode='individual' to export each customer's own peak value and date.
-OUTPUT_DIRECTORY = ROOT / 'outputs' / 'town_full_year'
+# Selected town_summer95_ref_0p1__g013; export each customer's own peak and date.
+# Use scripts/export_customer_reports.py for additional population-peak reports.
+OUTPUT_DIRECTORY = ROOT / 'outputs' / 'final_town_q_g013'
 BILLS_PATH = ROOT / 'data/prepared/bill_Customers_Town_Q_full_year.csv'
 
 def main():

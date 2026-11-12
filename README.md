@@ -1,3 +1,17 @@
+## Final-run defaults
+
+For the final **city** run, edit `configs/city_final.json` and use
+`scripts/city_workflow.py preflight`, `pilot`, `run`, or `reports`.
+See [CITY_WORKFLOW.md](CITY_WORKFLOW.md) for configuration fields, exact commands,
+peak definitions and reusable report extraction without another simulation.
+
+The IDE entry point and `configs/town.json` now use selected configuration
+`town_summer95_ref_0p1__g013` and individual peak export. For a timestamped Town_Q
+run with metrics and profiles, use `configs/final_town_q_experiment.json` with
+`scripts/run_hyperparameter_experiments.py`. See [FINAL_RUN_PLAN.md](FINAL_RUN_PLAN.md)
+for the Town_Q acceptance checks, city input requirements and presentation outputs.
+Older run recipes below describe their historical settings.
+
 ## Accepted-run customer reports
 
 Run `python scripts/export_customer_reports.py --config configs/customer_reports.json`

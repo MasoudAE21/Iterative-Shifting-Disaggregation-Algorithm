@@ -797,6 +797,8 @@ def run(root, cfg, output_dir=None, bills_path=None, weather_path=None, preloade
     # Final summaries are written after the measured context exits.
     manifest['wall_seconds'] = memory.seconds
     manifest['peak_rss_bytes'] = memory.peak
+    from .tbs import export_simulation_comparison
+    export_simulation_comparison(out, out, cfg)
     if cfg.tbs_path:
         from .tbs import compare_tbs
         roster_path = root / 'data/prepared/Customers_Town_Q.csv'

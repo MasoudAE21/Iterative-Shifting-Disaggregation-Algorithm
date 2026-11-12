@@ -3,6 +3,24 @@ import numpy as np
 import pandas as pd
 from .data import sha256
 
+def export_simulation_comparison(run, out, cfg):
+    """Export saved modeled totals without requiring station observations."""
+    modeled = pd.read_csv(run / 'aggregate_daily_summary.csv', parse_dates=['date_gregorian'])
+    dates = pd.DataFrame({'date_gregorian': pd.date_range(
+        cfg.target_start if cfg.bill_window == 'target' else cfg.simulation_start,
+        cfg.target_end_exclusive if cfg.bill_window == 'target' else cfg.simulation_end_exclusive,
+        inclusive='left')})
+    if 'total_floor_consumption_m3' not in modeled:
+        modeled['total_floor_consumption_m3'] = np.nan
+    columns = {'uniform_baseline_sum': 'total_uniform_consumption_m3',
+               'combined_observed_support_sum': 'final_algorithm_consumption_m3',
+               'coverage_fraction': 'included_customer_fraction',
+               'total_floor_consumption_m3': 'total_floor_consumption_m3'}
+    comparison = dates.merge(modeled[['date_gregorian', *columns]],
+                             on='date_gregorian', how='left', validate='one_to_one').rename(columns=columns)
+    comparison.to_csv(out / 'simulation_daily_comparison.csv', index=False)
+    return comparison
+
 def compare_tbs(path, out, cfg, *, roster_path=None):
     station = pd.read_csv(path, parse_dates=['date_gregorian'])
     station = station[['date_gregorian', 'consumption_m3']]

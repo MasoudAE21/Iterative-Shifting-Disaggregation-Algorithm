@@ -209,6 +209,7 @@ def read_bills(path, cfg, allow_sample=False):
                 raise ValueError(f'CSV shape at physical line {line_number}')
 
     normalized_chunks = []
+    excluded_type_rows = 0
     next_source_row = 2
     for raw_chunk in pd.read_csv(
         path,
@@ -223,8 +224,18 @@ def read_bills(path, cfg, allow_sample=False):
             date_format=cfg.bill_date_format,
         )
         next_source_row += len(normalized_chunk)
+        if cfg.consumption_types is not None:
+            selected = normalized_chunk.ConsumptionType.isin(cfg.consumption_types)
+            excluded_type_rows += int((~selected).sum())
+            normalized_chunk = normalized_chunk.loc[selected]
         normalized_chunks.append(normalized_chunk)
-    return audit_normalized(pd.concat(normalized_chunks, ignore_index=True), cfg=cfg)
+    selected_source = pd.concat(normalized_chunks, ignore_index=True)
+    if selected_source.empty:
+        raise ValueError('No bills match the configured consumption_types')
+    result, audit = audit_normalized(selected_source, cfg=cfg)
+    audit['consumption_type_filter'] = cfg.consumption_types
+    audit['excluded_consumption_type_rows'] = excluded_type_rows
+    return result, audit
 
 def coverage_classes(df, start, end):
     result = {ident: ('none', 0) for ident in df.SubscriptionNumber.dropna().unique()}

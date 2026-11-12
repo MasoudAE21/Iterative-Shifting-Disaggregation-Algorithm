@@ -14,13 +14,13 @@ def test_summer_grid_uses_new_implementation_and_preserves_report_settings():
     from scripts.run_hyperparameter_experiments import ROOT
     settings = json.loads((ROOT / 'configs/summer_floor_grid.json').read_text(encoding='utf-8-sig'))
     runs = expand_model_grid(settings)
-    assert len(runs) == 6
+    assert len(runs) == 36
     for model in runs:
         assert model['source'] == 'working_tree'
         p = model['parameters']
         assert p['customer_summer_floor'] is True
         assert p['summer_floor_fraction'] == .95
-        assert p['summer_min_covered_days'] == 30
+        assert p['summer_min_covered_days'] == 10
         assert p['summer_fallback_fraction'] == .1
         assert p['divide_consumption_by_unit_count'] is False
         assert p['max_customers'] is None
